@@ -75,6 +75,8 @@ pub struct Config {
     pub concurrent_downloads: usize,
     /// Retry videos where nothing was found after this many hours.
     pub retry_hours: u64,
+    /// Let the Task Scheduler task install new versions from GitHub.
+    pub auto_update: bool,
 }
 
 impl Default for Config {
@@ -98,6 +100,7 @@ impl Default for Config {
             poll_interval_seconds: 300,
             concurrent_downloads: 2,
             retry_hours: 24,
+            auto_update: true,
         }
     }
 }

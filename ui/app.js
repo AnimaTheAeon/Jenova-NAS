@@ -179,6 +179,7 @@ function renderStatus() {
   const limit = status.watch_limit ? Number(status.watch_limit).toLocaleString() : "unknown";
   $("#live-info").innerHTML = `<span class="label">LIVE</span>&nbsp; ${Number(status.live_watches || 0).toLocaleString()} folder(s) watched live · DSM allows ${limit}`
     + (polled ? ` · <span class="warn">${polled} folder(s) polled because the limit was reached</span>` : "");
+  renderUpdate(status.update || {});
   $("#about").textContent = `Jenova for DSM v${status.version}`;
   renderStatusBar();
 }
@@ -202,6 +203,37 @@ function renderCleanup(c) {
       set("Older Windows versions saved copies like Movie.en.srt.bak next to your subtitles.", "dim",
         `<button data-cleanup="find" ${status && status.folders.length ? "" : "disabled"}>Find .bak files</button>`);
   }
+}
+
+function ago(secs) {
+  if (secs < 90) return "just now";
+  if (secs < 5400) return Math.round(secs / 60) + " min ago";
+  if (secs < 129600) return Math.round(secs / 3600) + " h ago";
+  return Math.round(secs / 86400) + " days ago";
+}
+
+function renderUpdate(u) {
+  const st = $("#update-state");
+  const checked = u.checked_at ? ` <span class="dim small">· checked ${ago(u.now - u.checked_at)}</span>` : "";
+  if (u.checking) st.innerHTML = `Installed ${esc(u.current)} · <span class="warn">Checking GitHub…</span>`;
+  else if (u.error) st.innerHTML = `Installed ${esc(u.current)} · <span class="bad">Couldn't check GitHub</span>${checked}`;
+  else if (u.available) st.innerHTML = `Installed ${esc(u.current)} · <span class="warn">Version ${esc(u.latest)} is out</span> <a href="${esc(u.page)}" target="_blank" rel="noopener">see release</a>${checked}`;
+  else if (u.latest) st.innerHTML = `Installed ${esc(u.current)} · <span class="good">Up to date</span>${checked}`;
+  else st.innerHTML = `Installed ${esc(u.current)}`;
+  $("#update-check").disabled = !!u.checking;
+
+  const last = u.last_install;
+  const lastEl = $("#update-last");
+  if (last && last.time) {
+    const when = ago(u.now - last.time);
+    lastEl.innerHTML = last.ok
+      ? `<span class="label">TASK</span>&nbsp; Ran ${when}: ${esc(last.message)}`
+      : `<span class="label">TASK</span>&nbsp; <span class="bad">Ran ${when}: ${esc(last.message)}</span>`;
+  } else lastEl.innerHTML = "";
+  // Show the setup steps until the scheduled task has run once.
+  $("#update-setup").style.display = config && config.auto_update && !(last && last.time) ? "" : "none";
+  const cmd = $("#update-command");
+  if (cmd.value !== u.command) cmd.value = u.command || "";
 }
 
 function renderStatusBar() {
@@ -367,6 +399,8 @@ function wireActions() {
     }
   };
   $("#clear-jobs").onclick = async () => { await api("jobs/clear", {}); refresh(); };
+  $("#update-check").onclick = async () => { await api("update/check", {}); refreshStatus(); setTimeout(refreshStatus, 3000); };
+  $("#update-command").onclick = (e) => e.target.select();
   $("#reinstall").onclick = async () => { await api("subliminal/reinstall", {}); refreshStatus(); };
   $("#cleanup-buttons").onclick = async (e) => {
     const b = e.target.closest("[data-cleanup]");

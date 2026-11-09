@@ -125,6 +125,22 @@
           <span class="label">PERFORMANCE</span>
           <div class="row">Download for up to <input type="number" min="1" max="8" data-key="concurrent_downloads"> videos at a time</div>
         </div>
+        <div class="section">
+          <span class="label">UPDATES</span>
+          <div class="row"><span id="update-state"></span><span class="grow"></span><button id="update-check" class="small">Check now</button></div>
+          <label class="check"><input type="checkbox" data-key="auto_update"><span class="box"></span>Install updates from GitHub automatically</label>
+          <div class="row small" id="update-last"></div>
+          <div id="update-setup" class="notice" style="display:none">
+            <b>One-time setup.</b> DSM only lets packages install updates through a scheduled task:
+            <ol>
+              <li><b>Control Panel</b> &rarr; <b>Task Scheduler</b> &rarr; <b>Create</b> &rarr; <b>Scheduled Task</b> &rarr; <b>User-defined script</b></li>
+              <li><b>General:</b> name it <i>Jenova update</i>, set <b>User</b> to <b>root</b></li>
+              <li><b>Schedule:</b> Daily, at a quiet time such as 4:15</li>
+              <li><b>Task Settings</b> &rarr; <b>Run command</b>, paste:<br><input type="text" id="update-command" class="command" readonly></li>
+              <li>Click <b>OK</b>. To test it now, select the task and click <b>Run</b>.</li>
+            </ol>
+          </div>
+        </div>
         <div class="divider"></div>
         <div class="row dim small"><span id="about"></span></div>
       </div>
