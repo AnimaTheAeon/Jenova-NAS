@@ -194,6 +194,11 @@ fn handle(mut req: Request, shared: &Arc<Shared>, cache: &AuthCache) {
             shared.reset_cleanup();
             Ok(json!({ "ok": true }))
         }
+        (false, "update") => Ok(crate::update::status_json()),
+        (true, "update/check") => {
+            crate::update::request_check();
+            Ok(crate::update::status_json())
+        }
         (true, "subliminal/reinstall") => {
             engine::request_reinstall(shared);
             Ok(json!({ "ok": true }))
@@ -241,6 +246,7 @@ fn status(shared: &Arc<Shared>) -> Value {
         "subs_total": shared.subs_found_total(),
         "cleanup": shared.cleanup.lock().unwrap_or_else(|e| e.into_inner()).to_json(),
         "user": std::env::var("USER").unwrap_or_default(),
+        "update": crate::update::status_json(),
     })
 }
 
