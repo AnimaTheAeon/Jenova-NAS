@@ -113,7 +113,8 @@
           <label class="check"><input type="checkbox" data-key="catch_up"><span class="box"></span>When Jenova starts, also check files already in the folders</label>
           <div class="row">Retry videos where nothing was found after <input type="number" min="1" max="720" data-key="retry_hours"> hours</div>
           <label class="check"><input type="checkbox" data-key="polling"><span class="box"></span>Use polling instead of live watching</label>
-          <div class="row dim small">Live watching is instant and costs nothing while idle. Jenova switches a folder to polling on its own if DSM can't watch it live.</div>
+          <div class="row dim small">Live watching is instant and costs nothing while idle. Only media folders are watched (never @eaDir, #recycle, #snapshot or other DSM system folders). Jenova switches a folder to polling on its own if DSM can't watch it live.</div>
+          <div class="row small" id="live-info"></div>
           <div class="row">Poll every <input type="number" min="30" max="86400" data-key="poll_interval_seconds"> seconds</div>
         </div>
         <div class="section">

@@ -236,6 +236,8 @@ fn status(shared: &Arc<Shared>) -> Value {
         "queued": shared.queued.load(Ordering::SeqCst),
         "running": shared.running.load(Ordering::SeqCst),
         "scanning": shared.scanning.load(Ordering::SeqCst) > 0,
+        "live_watches": shared.live_watches.load(Ordering::SeqCst),
+        "watch_limit": shared.watch_limit.load(Ordering::SeqCst),
         "subs_total": shared.subs_found_total(),
         "cleanup": shared.cleanup.lock().unwrap_or_else(|e| e.into_inner()).to_json(),
         "user": std::env::var("USER").unwrap_or_default(),

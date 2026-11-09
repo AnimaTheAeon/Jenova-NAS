@@ -65,6 +65,9 @@ pub struct Shared {
     pub queued: AtomicUsize,
     pub running: AtomicUsize,
     pub scanning: AtomicUsize,
+    /// Folders currently watched live, and DSM's per-user limit.
+    pub live_watches: AtomicUsize,
+    pub watch_limit: AtomicUsize,
     pub started: Instant,
     pub cleanup: Mutex<Cleanup>,
     history: Mutex<HashMap<String, Record>>,
@@ -200,6 +203,8 @@ pub enum Msg {
     InstallSubliminal,
     SubliminalReady,
     Fs(notify::Result<notify::Event>),
+    /// New or changed videos found by the poller.
+    Polled(Vec<PathBuf>),
     Found {
         folder: String,
         videos: Vec<PathBuf>,
@@ -283,6 +288,8 @@ pub fn start() -> Arc<Shared> {
         queued: AtomicUsize::new(0),
         running: AtomicUsize::new(0),
         scanning: AtomicUsize::new(0),
+        live_watches: AtomicUsize::new(0),
+        watch_limit: AtomicUsize::new(read_watch_limit()),
         started: Instant::now(),
         cleanup: Mutex::new(Cleanup::Idle),
         history: Mutex::new(history),
@@ -317,7 +324,13 @@ struct Engine {
     shared: Arc<Shared>,
     tx: Sender<Msg>,
     inotify: Option<notify::INotifyWatcher>,
-    poller: Option<notify::PollWatcher>,
+    /// Folders watched live (media folders only, one watch each).
+    live_dirs: HashSet<PathBuf>,
+    /// Roots watched live (vs. polled).
+    live_roots: Vec<PathBuf>,
+    /// Stops the poller thread when set.
+    poll_stop: Option<Arc<AtomicBool>>,
+    limit_warned: bool,
     active: Vec<String>,
     candidates: HashMap<PathBuf, Candidate>,
     queue: VecDeque<(u64, PathBuf)>,
@@ -333,7 +346,10 @@ impl Engine {
             shared,
             tx,
             inotify: None,
-            poller: None,
+            live_dirs: HashSet::new(),
+            live_roots: Vec::new(),
+            poll_stop: None,
+            limit_warned: false,
             active: Vec::new(),
             candidates: HashMap::new(),
             queue: VecDeque::new(),
@@ -382,6 +398,11 @@ impl Engine {
                 self.installing = false;
             }
             Msg::Fs(event) => self.on_event(event),
+            Msg::Polled(paths) => {
+                for path in paths {
+                    self.add_candidate(path, false);
+                }
+            }
             Msg::Found {
                 folder,
                 videos,
@@ -513,7 +534,12 @@ impl Engine {
 
         // Rebuild watchers from scratch; cheap and keeps state simple.
         self.inotify = None;
-        self.poller = None;
+        self.live_dirs.clear();
+        self.live_roots.clear();
+        self.limit_warned = false;
+        if let Some(stop) = self.poll_stop.take() {
+            stop.store(true, Ordering::SeqCst);
+        }
         self.candidates.clear();
         let first_start = self.active.is_empty();
         let newly_added: Vec<String> = wanted
@@ -560,59 +586,61 @@ impl Engine {
         let handler = move |event: notify::Result<notify::Event>| {
             let _ = tx.send(Msg::Fs(event));
         };
+        let limit = read_watch_limit();
+        self.shared.watch_limit.store(limit, Ordering::SeqCst);
         let mut use_polling: Vec<String> = Vec::new();
+        let ready: Vec<String> = wanted
+            .iter()
+            .filter(|f| folders.get(*f).is_some_and(|i| i.state.is_empty()))
+            .cloned()
+            .collect();
         if !config.polling {
-            match notify::INotifyWatcher::new(handler.clone(), notify::Config::default()) {
-                Ok(mut watcher) => {
-                    for folder in &wanted {
-                        if !folders.get(folder).is_some_and(|f| f.state.is_empty()) {
-                            continue;
-                        }
-                        match watcher.watch(Path::new(folder), RecursiveMode::Recursive) {
-                            Ok(()) => {
-                                folders.get_mut(folder).map(|f| f.state = "watching".into());
+            match notify::INotifyWatcher::new(handler, notify::Config::default()) {
+                Ok(watcher) => {
+                    self.inotify = Some(watcher);
+                    for folder in &ready {
+                        match self.watch_tree(Path::new(folder), config.ignore_extras) {
+                            Ok(count) => {
+                                self.live_roots.push(PathBuf::from(folder));
+                                debug!("{folder}: watching {count} folder(s) live");
+                                if let Some(f) = folders.get_mut(folder) {
+                                    f.state = "watching".into();
+                                }
                             }
                             Err(error) => {
-                                // Typically DSM's inotify watch limit on huge trees.
-                                let _ = watcher.unwatch(Path::new(folder));
-                                warn!("{folder}: live watching unavailable ({error}); using polling");
+                                warn!(
+                                    "{folder}: too many folders to watch live (DSM allows {limit}); polling every {}s instead. {error}",
+                                    config.poll_interval_seconds
+                                );
                                 use_polling.push(folder.clone());
                             }
                         }
                     }
-                    self.inotify = Some(watcher);
                 }
                 Err(error) => {
-                    warn!("inotify unavailable ({error}); using polling");
-                    use_polling.extend(wanted.iter().cloned());
+                    warn!("Live watching unavailable ({error}); polling instead");
+                    use_polling.extend(ready.iter().cloned());
                 }
             }
         } else {
-            use_polling.extend(wanted.iter().cloned());
+            use_polling.extend(ready.iter().cloned());
         }
+        self.shared.live_watches.store(self.live_dirs.len(), Ordering::SeqCst);
 
-        use_polling.retain(|f| folders.get(f).is_some_and(|i| i.state.is_empty()));
         if !use_polling.is_empty() {
-            let poll_config = notify::Config::default()
-                .with_poll_interval(Duration::from_secs(config.poll_interval_seconds));
-            match notify::PollWatcher::new(handler, poll_config) {
-                Ok(mut watcher) => {
-                    for folder in &use_polling {
-                        match watcher.watch(Path::new(folder), RecursiveMode::Recursive) {
-                            Ok(()) => {
-                                folders.get_mut(folder).map(|f| f.state = "polling".into());
-                            }
-                            Err(error) => {
-                                if let Some(f) = folders.get_mut(folder) {
-                                    f.state = "error".into();
-                                    f.error = Some(error.to_string());
-                                }
-                            }
-                        }
-                    }
-                    self.poller = Some(watcher);
+            let stop = Arc::new(AtomicBool::new(false));
+            start_poller(
+                use_polling.iter().map(PathBuf::from).collect(),
+                Duration::from_secs(config.poll_interval_seconds),
+                config.ignore_extras,
+                self.tx.clone(),
+                Arc::clone(&stop),
+            );
+            self.poll_stop = Some(stop);
+            for folder in &use_polling {
+                if let Some(f) = folders.get_mut(folder) {
+                    f.state = "polling".into();
                 }
-                Err(error) => warn!("Polling unavailable: {error}"),
             }
         }
 
@@ -676,7 +704,64 @@ impl Engine {
         });
     }
 
+    /// Watch `root` and every media subfolder under it, one watch per
+    /// folder, skipping DSM system folders (and extras if ignored). If DSM's
+    /// watch limit is hit, everything added by this call is removed again.
+    fn watch_tree(&mut self, root: &Path, ignore_extras: bool) -> Result<usize, notify::Error> {
+        let Some(watcher) = self.inotify.as_mut() else {
+            return Ok(0);
+        };
+        let live = &mut self.live_dirs;
+        let mut added: Vec<PathBuf> = Vec::new();
+        let mut stack = vec![root.to_path_buf()];
+        while let Some(dir) = stack.pop() {
+            if live.contains(&dir) {
+                continue;
+            }
+            match watcher.watch(&dir, RecursiveMode::NonRecursive) {
+                Ok(()) => {
+                    live.insert(dir.clone());
+                    added.push(dir.clone());
+                }
+                Err(error) if matches!(error.kind, notify::ErrorKind::MaxFilesWatch) => {
+                    for d in &added {
+                        let _ = watcher.unwatch(d);
+                        live.remove(d);
+                    }
+                    return Err(error);
+                }
+                // Unreadable or vanished folder: skip it.
+                Err(_) => continue,
+            }
+            let Ok(entries) = std::fs::read_dir(&dir) else {
+                continue;
+            };
+            for entry in entries.flatten() {
+                if !entry.file_type().is_ok_and(|t| t.is_dir()) {
+                    continue;
+                }
+                let name = entry.file_name();
+                if !skip_dir(&name.to_string_lossy(), ignore_extras) {
+                    stack.push(entry.path());
+                }
+            }
+        }
+        Ok(added.len())
+    }
+
+    /// Forget live watches for a folder that was removed or renamed away.
+    fn forget_tree(&mut self, gone: &Path) {
+        let stale: Vec<PathBuf> = self.live_dirs.iter().filter(|d| d.starts_with(gone)).cloned().collect();
+        for dir in stale {
+            if let Some(watcher) = self.inotify.as_mut() {
+                let _ = watcher.unwatch(&dir);
+            }
+            self.live_dirs.remove(&dir);
+        }
+    }
+
     fn on_event(&mut self, event: notify::Result<notify::Event>) {
+        use notify::event::{ModifyKind, RemoveKind, RenameMode};
         let event = match event {
             Ok(event) => event,
             Err(error) => {
@@ -684,20 +769,59 @@ impl Engine {
                 return;
             }
         };
+        let ignore_extras = self.config().ignore_extras;
+
+        // Keep live watches in step with folders being removed or renamed.
+        match event.kind {
+            EventKind::Remove(RemoveKind::Folder) => {
+                for path in &event.paths {
+                    self.forget_tree(path);
+                }
+            }
+            EventKind::Modify(ModifyKind::Name(RenameMode::From)) => {
+                for path in &event.paths {
+                    self.forget_tree(path);
+                }
+            }
+            EventKind::Modify(ModifyKind::Name(RenameMode::Both)) => {
+                if let Some(old) = event.paths.first() {
+                    self.forget_tree(old);
+                }
+            }
+            _ => {}
+        }
         if !matches!(event.kind, EventKind::Create(_) | EventKind::Modify(_) | EventKind::Any) {
+            self.shared.live_watches.store(self.live_dirs.len(), Ordering::SeqCst);
             return;
         }
-        let ignore_extras = self.config().ignore_extras;
-        for path in event.paths {
+        let paths = match event.kind {
+            // For a rename, only the new name matters.
+            EventKind::Modify(ModifyKind::Name(RenameMode::Both)) => event.paths.into_iter().skip(1).collect(),
+            EventKind::Modify(ModifyKind::Name(RenameMode::From)) => Vec::new(),
+            _ => event.paths,
+        };
+        for path in paths {
             if in_skipped_folder(&path, ignore_extras) {
                 continue;
             }
             if path.is_dir() {
-                // A folder moved in produces no events for its contents.
                 let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-                if is_system_folder(name) || (ignore_extras && is_extras_folder(name)) {
+                if skip_dir(name, ignore_extras) {
                     continue;
                 }
+                // New media folder under a live-watched root: watch it too.
+                if self.live_roots.iter().any(|r| path.starts_with(r)) {
+                    if let Err(error) = self.watch_tree(&path, ignore_extras) {
+                        if !self.limit_warned {
+                            self.limit_warned = true;
+                            warn!(
+                                "DSM's live-watch limit ({}) reached; new folders won't be watched live until it's raised. {error}",
+                                self.shared.watch_limit.load(Ordering::SeqCst)
+                            );
+                        }
+                    }
+                }
+                // A folder moved in produces no events for its contents.
                 for video in walk_videos(&path, ignore_extras) {
                     self.add_candidate(video, false);
                 }
@@ -705,6 +829,7 @@ impl Engine {
                 self.add_candidate(path, false);
             }
         }
+        self.shared.live_watches.store(self.live_dirs.len(), Ordering::SeqCst);
     }
 
     /// Returns true if newly added.
@@ -1055,6 +1180,63 @@ fn download(python: &str, video: &Path, config: &Config, cancel: &AtomicBool) ->
         out.summary
     };
     (langs, out.success || !changed.is_empty(), message)
+}
+
+/// DSM's per-user live-watch limit (fs.inotify.max_user_watches).
+pub fn read_watch_limit() -> usize {
+    std::fs::read_to_string("/proc/sys/fs/inotify/max_user_watches")
+        .ok()
+        .and_then(|s| s.trim().parse().ok())
+        .unwrap_or(0)
+}
+
+fn skip_dir(name: &str, ignore_extras: bool) -> bool {
+    is_system_folder(name) || (ignore_extras && is_extras_folder(name))
+}
+
+/// Lightweight poller for folders that can't be watched live: every
+/// `interval` it lists video files (skipping DSM system folders) and reports
+/// ones that are new or changed. It never opens the videos.
+fn start_poller(
+    roots: Vec<PathBuf>,
+    interval: Duration,
+    ignore_extras: bool,
+    tx: Sender<Msg>,
+    stop: Arc<AtomicBool>,
+) {
+    std::thread::Builder::new()
+        .name("poller".into())
+        .spawn(move || {
+            let snapshot = |roots: &[PathBuf]| -> HashMap<PathBuf, (u64, i64)> {
+                roots
+                    .iter()
+                    .flat_map(|r| walk_videos(r, ignore_extras))
+                    .filter_map(|p| fingerprint(&p).map(|f| (p, f)))
+                    .collect()
+            };
+            let mut last = snapshot(&roots);
+            loop {
+                let mut waited = Duration::ZERO;
+                while waited < interval {
+                    if stop.load(Ordering::SeqCst) {
+                        return;
+                    }
+                    std::thread::sleep(Duration::from_secs(5));
+                    waited += Duration::from_secs(5);
+                }
+                let now = snapshot(&roots);
+                let changed: Vec<PathBuf> = now
+                    .iter()
+                    .filter(|(p, f)| last.get(*p) != Some(*f))
+                    .map(|(p, _)| p.clone())
+                    .collect();
+                last = now;
+                if !changed.is_empty() && tx.send(Msg::Polled(changed)).is_err() {
+                    return;
+                }
+            }
+        })
+        .ok();
 }
 
 /// Recursively list videos, skipping DSM system folders (and extras).
