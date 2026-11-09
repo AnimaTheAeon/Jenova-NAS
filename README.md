@@ -3,7 +3,7 @@
 Watches your media folders on a Synology NAS and downloads subtitles for new videos automatically, using [Subliminal](https://github.com/Diaoul/subliminal). It runs as a lightweight DSM package and opens in its own window from the DSM main menu, with the same menu-style interface as [Jenova for Windows](https://github.com/AnimaTheAeon/Jenova).
 
 - **Light:** a single ~1 MB service. Idle, it uses no CPU and a few MB of memory, so your disks can sleep. Subliminal only runs (at low priority) while a video is being processed.
-- **Live watching:** new files are picked up instantly. If DSM can't watch a very large folder live, Jenova switches that folder to polling on its own.
+- **Live watching, media folders only:** new files are picked up instantly. Jenova watches each media folder individually and never watches `@eaDir`, `#recycle`, `#snapshot` or other DSM system folders (often 80% fewer watches). Config shows how many folders are watched live against DSM's limit. If a library is too big for the limit, that folder switches to a light poll that lists video files only.
 - **Waits for copies to finish:** a file copied in over the network is only processed after it stops changing (60 s by default).
 - **Never downloads over existing subtitles:** each video is checked again right before downloading.
 - **Synology-aware:** skips `@eaDir`, `#recycle`, `#snapshot` and other DSM system folders, and Plex extras folders if you want.

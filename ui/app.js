@@ -175,6 +175,10 @@ function renderStatus() {
   }
   $("#reinstall").disabled = s.state === "installing" || s.state === "checking";
   renderCleanup(status.cleanup || { state: "idle" });
+  const polled = status.folders.filter((f) => f.state === "polling").length;
+  const limit = status.watch_limit ? Number(status.watch_limit).toLocaleString() : "unknown";
+  $("#live-info").innerHTML = `<span class="label">LIVE</span>&nbsp; ${Number(status.live_watches || 0).toLocaleString()} folder(s) watched live · DSM allows ${limit}`
+    + (polled ? ` · <span class="warn">${polled} folder(s) polled because the limit was reached</span>` : "");
   $("#about").textContent = `Jenova for DSM v${status.version}`;
   renderStatusBar();
 }
