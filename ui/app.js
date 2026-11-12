@@ -86,6 +86,94 @@ function buildMenu() {
   go(location.hash.slice(1) || "watch");
 }
 
+// ---------- Box of X look ----------
+
+let greenHome = true;     // on the orb's home screen
+let greenCursor = 0;      // highlighted entry there
+const isGreen = () => document.body.classList.contains("green");
+
+function applyTheme(theme) {
+  const green = theme === "green";
+  if (green === isGreen() && document.body.dataset.themed) return;
+  document.body.dataset.themed = "1";
+  document.body.classList.toggle("green", green);
+  $$("#theme-pick [data-theme]").forEach((b) => b.classList.toggle("picked", b.dataset.theme === (green ? "green" : "ff")));
+  if (green) greenShowHome(false);
+  else document.body.classList.remove("g-at-home");
+}
+
+function buildGreenMenu() {
+  $("#g-menu").innerHTML = PAGES.map(([id, label], i) =>
+    `<button class="g-tab" data-g="${i}"><span class="g-node"></span><span class="g-plate">${esc(label.toUpperCase())}</span></button>`).join("");
+  $("#g-menu").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-g]");
+    if (b) greenOpen(Number(b.dataset.g));
+  });
+  $("#g-menu").addEventListener("mouseover", (e) => {
+    const b = e.target.closest("[data-g]");
+    if (b) { greenCursor = Number(b.dataset.g); greenMarkCursor(); }
+  });
+  $("#g-select").onclick = () => greenOpen(greenCursor);
+  $("#g-back").onclick = greenBack;
+  document.addEventListener("keydown", (e) => {
+    if (!isGreen() || $("#picker").classList.contains("open")) return;
+    const typing = /INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || "");
+    if (greenHome) {
+      if (e.key === "ArrowDown") { greenCursor = (greenCursor + 1) % PAGES.length; greenMarkCursor(); e.preventDefault(); }
+      else if (e.key === "ArrowUp") { greenCursor = (greenCursor + PAGES.length - 1) % PAGES.length; greenMarkCursor(); e.preventDefault(); }
+      else if (e.key === "Enter") { greenOpen(greenCursor); e.preventDefault(); }
+    } else if (e.key === "Escape" && !typing) {
+      greenBack();
+    } else if (e.key === "Escape" && typing) {
+      document.activeElement.blur();
+    }
+  });
+  greenMarkCursor();
+}
+
+function greenMarkCursor() {
+  $$("#g-menu .g-tab").forEach((b, i) => b.classList.toggle("lit", i === greenCursor));
+}
+
+function greenOpen(i) {
+  greenCursor = i;
+  greenMarkCursor();
+  document.body.classList.add("g-zoom");
+  setTimeout(() => {
+    greenHome = false;
+    document.body.classList.remove("g-at-home", "g-zoom");
+    go(PAGES[i][0]);
+    document.body.classList.add("g-reveal");
+    setTimeout(() => document.body.classList.remove("g-reveal"), 320);
+  }, 280);
+}
+
+function greenBack() {
+  if (page === "log") { go("config"); return; }
+  greenShowHome(true);
+}
+
+function greenShowHome(animate) {
+  greenHome = true;
+  greenCursor = Math.max(0, PAGES.findIndex(([p]) => p === (HIDDEN_PAGES[page] || page)));
+  greenMarkCursor();
+  document.body.classList.add("g-at-home");
+  if (animate) {
+    document.body.classList.add("g-unzoom");
+    setTimeout(() => document.body.classList.remove("g-unzoom"), 320);
+  }
+}
+
+function renderGreenStatus() {
+  if (!status) return;
+  const queued = (status.queued || 0) + (status.running || 0);
+  const top = `${queued.toLocaleString()} QUEUED · ${Number(status.found_today || 0).toLocaleString()} FOUND TODAY`;
+  const bottom = $("#statusbar").textContent;
+  $$(".g-status .g-top").forEach((el) => { el.textContent = top; });
+  $$(".g-status .g-bottom").forEach((el) => { el.textContent = bottom; });
+  $$(".g-status").forEach((el) => el.classList.toggle("busy", queued > 0));
+}
+
 function go(id) {
   if (!PAGES.some(([p]) => p === id) && !HIDDEN_PAGES[id]) id = "watch";
   page = id;
@@ -93,6 +181,8 @@ function go(id) {
   $$(".menu-item").forEach((b) => b.classList.toggle("selected", b.dataset.go === menuId));
   $$(".page").forEach((p) => p.classList.toggle("active", p.dataset.page === id));
   history.replaceState(null, "", "#" + id);
+  const title = $("#g-title");
+  if (title) title.textContent = (PAGES.find(([p]) => p === id) || [id, id === "log" ? "Log" : id])[1].toUpperCase();
   refresh();
 }
 
@@ -251,6 +341,7 @@ function renderStatusBar() {
     else if (s.retry_waiting) text += ` ${Number(s.retry_waiting).toLocaleString()} waiting for subtitles to come out.`;
   }
   $("#statusbar").textContent = text;
+  renderGreenStatus();
 }
 
 function renderJobs(jobs) {
@@ -294,6 +385,7 @@ function applyConfigToForm() {
   $$("[data-list]").forEach((el) => { el.checked = (config[el.dataset.list] || []).includes(el.value); });
   $("#os-password").placeholder = config.has_password ? "•••••••• (saved)" : "";
   renderLanguages();
+  applyTheme(config.theme);
 }
 
 let saveTimer = null;
@@ -441,6 +533,15 @@ function wireActions() {
     }
   };
   $("#view-log").onclick = () => go("log");
+  $("#theme-pick").onclick = (e) => {
+    const b = e.target.closest("[data-theme]");
+    if (!b || b.dataset.theme === config.theme) return;
+    config.theme = b.dataset.theme;
+    applyTheme(config.theme);
+    // Stay on Settings in the new look.
+    if (isGreen()) { greenHome = false; document.body.classList.remove("g-at-home"); go("config"); }
+    queueSave({ theme: config.theme });
+  };
   $("#log-back").onclick = () => go("config");
   $("#clear-jobs").onclick = async () => { await api("jobs/clear", {}); refresh(); };
   $("#update-check").onclick = async () => { await api("update/check", {}); refreshStatus(); setTimeout(refreshStatus, 3000); };
@@ -483,6 +584,7 @@ document.addEventListener("visibilitychange", () => { if (document.visibilitySta
 (async function init() {
   await getToken();
   buildMenu();
+  buildGreenMenu();
   wireSettings();
   wirePicker();
   wireActions();

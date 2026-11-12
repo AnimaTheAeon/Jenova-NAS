@@ -57,6 +57,7 @@ GitHub Actions builds and tests every push. Bumping `version` in `Cargo.toml` an
 
 ## How it works
 
+- Two looks, picked under **Settings → Look**: the FFVII menu, or **Box of X** (green orb home screen; arrow keys and Enter to pick a page, Esc to go back).
 - Three pages: **Watch** (folders, Check existing files, Scan a folder once), **Activity** (what Jenova looked at and the result) and **Settings** (languages, watching, downloads, subtitle sites, updates; technical options under **Advanced**; **View Log** at the top).
 - New arrivals go to the front of the queue. Up to 3 downloads run at once by default (5 at most).
 - When nothing is online yet, the video is tried again after 6 hours, then 1 day, 3 days, and weekly after that.
@@ -72,3 +73,6 @@ Jenova checks GitHub twice a day and shows what's available on its **Config** pa
 - Run command: `/var/packages/Jenova/target/bin/jenova-nas update`
 
 The task does nothing when Jenova is up to date or when **Install updates from GitHub automatically** is off. Each download is checked against GitHub's SHA-256 before it's installed.
+
+
+Box of X font: [Orbitron](https://github.com/theleagueof/orbitron) (SIL Open Font License, `ui/fonts/Orbitron-OFL.txt`).

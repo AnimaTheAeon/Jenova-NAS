@@ -22,7 +22,49 @@
   </defs>
 </svg>
 
+<!-- Box of X: home screen with the orb -->
+<div id="g-home" class="g-only">
+  <div class="g-orb-wrap">
+    <div class="g-ring"></div>
+    <svg class="g-orb" viewBox="0 0 400 400" aria-hidden="true">
+      <defs>
+        <radialGradient id="g-sphere" cx="45%" cy="40%" r="62%">
+          <stop offset="0" stop-color="#b6ff4a"/>
+          <stop offset="0.45" stop-color="#5cc81e"/>
+          <stop offset="0.8" stop-color="#2a8a10"/>
+          <stop offset="1" stop-color="#145a08"/>
+        </radialGradient>
+        <radialGradient id="g-shine" cx="50%" cy="50%" r="50%">
+          <stop offset="0" stop-color="#fff" stop-opacity="0.75"/>
+          <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+        </radialGradient>
+        <filter id="g-glow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="10"/></filter>
+      </defs>
+      <circle cx="200" cy="200" r="182" fill="none" stroke="#8de83a" stroke-opacity="0.35" stroke-width="2"/>
+      <circle cx="200" cy="200" r="170" fill="none" stroke="#8de83a" stroke-opacity="0.7" stroke-width="3"/>
+      <circle cx="200" cy="200" r="160" fill="#7ee030" opacity="0.35" filter="url(#g-glow)"/>
+      <circle cx="200" cy="200" r="150" fill="url(#g-sphere)"/>
+      <ellipse cx="150" cy="255" rx="72" ry="50" fill="#d6ff9a" opacity="0.13"/>
+      <ellipse cx="260" cy="290" rx="88" ry="38" fill="#d6ff9a" opacity="0.12"/>
+      <ellipse cx="290" cy="185" rx="52" ry="80" fill="#d6ff9a" opacity="0.1"/>
+      <ellipse cx="160" cy="125" rx="52" ry="40" fill="url(#g-shine)"/>
+      <g fill="none" stroke="#efffd0" stroke-width="5" stroke-linejoin="round">
+        <path d="M200 115 C245 150 245 250 200 285 C155 250 155 150 200 115 Z"/>
+        <path d="M115 200 C150 182 250 182 285 200 C250 218 150 218 115 200 Z" stroke-width="3.5"/>
+      </g>
+      <circle cx="200" cy="200" r="14" fill="#fbffe8"/>
+    </svg>
+  </div>
+  <nav id="g-menu"></nav>
+  <div class="g-status g-status-home"><i class="g-led"></i><div><div class="g-top"></div><div class="g-bottom"></div></div></div>
+  <button class="g-hint g-select" id="g-select"><span class="g-key">ENTER</span>SELECT</button>
+</div>
+
 <div class="layout">
+  <div id="g-head" class="g-only">
+    <div id="g-title"></div>
+    <div class="g-status"><i class="g-led"></i><div><div class="g-top"></div><div class="g-bottom"></div></div></div>
+  </div>
   <section id="main" class="win">
 
     <!-- Watch -->
@@ -108,6 +150,10 @@
             </ol>
           </div>
         </div>
+        <div class="section">
+          <span class="label">LOOK</span>
+          <div class="row" id="theme-pick"><button data-theme="ff">FFVII menu</button><button data-theme="green">Box of X</button></div>
+        </div>
         <details class="section advanced" id="advanced">
           <summary class="label">ADVANCED</summary>
           <div class="section">
@@ -156,6 +202,7 @@
   </aside>
 
   <footer id="statusbar" class="win">Connecting…</footer>
+  <div id="g-foot" class="g-only"><button class="g-hint" id="g-back"><span class="g-key">ESC</span>BACK</button></div>
 </div>
 
 <!-- Folder picker -->
