@@ -23,7 +23,7 @@ Ext.define("Jenova.AppWindow", {
 				xtype: "box",
 				autoEl: {
 					tag: "iframe",
-					src: "/webman/3rdparty/Jenova/index.html",
+					src: "/webman/3rdparty/Jenova/index.html?v=@VERSION@",
 					width: "100%",
 					height: "100%",
 					frameborder: "0",
