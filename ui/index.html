@@ -36,94 +36,61 @@
       <div id="folders" class="scroll"></div>
       <div class="footer">
         <button id="add-folder">Add Folder</button>
-        <button id="check-now">Check existing files</button>
+        <button id="check-now" title="Look through the watched folders now. Jenova also does this once a day by itself.">Check existing files</button>
+        <button id="scan-once" title="Get subtitles for a folder you don't want to watch, one time">Scan a folder once…</button>
         <span class="grow"></span>
         <span id="scan-note" class="dim small"></span>
       </div>
     </div>
 
-    <!-- Downloads -->
-    <div class="page" data-page="downloads">
+    <!-- Activity -->
+    <div class="page" data-page="activity">
       <div class="page-head">
-        <h1>Downloads</h1><span class="grow"></span>
+        <h1>Activity</h1><span class="grow"></span>
         <button id="clear-jobs">Clear finished</button>
       </div>
-      <p class="sub">Videos Jenova looked for subtitles for, newest first.</p>
+      <p class="sub">Videos Jenova looked at, newest first. When nothing's online yet, it tries again later by itself.</p>
       <div class="divider"></div>
       <div class="scroll">
         <table>
-          <thead><tr><th>Result</th><th>Video</th><th>Language</th><th>When</th></tr></thead>
+          <thead><tr><th>Status</th><th>Video</th><th>Language</th><th>When</th></tr></thead>
           <tbody id="jobs"></tbody>
         </table>
-        <div id="jobs-empty" class="empty"><h2>Nothing yet</h2>New arrivals will show up here.</div>
+        <div id="jobs-empty" class="empty"><h2>Nothing yet</h2>New videos will show up here.</div>
       </div>
     </div>
 
-    <!-- Language -->
-    <div class="page" data-page="language">
-      <div class="page-head"><h1>Language</h1><span class="grow"></span><span class="saved">Saved</span></div>
-      <p class="sub">Which subtitles to look for, and when.</p>
-      <div class="divider"></div>
-      <div class="scroll">
-        <div class="section">
-          <label class="check"><input type="checkbox" data-key="exclude_hearing_impaired"><span class="box"></span>Skip hearing-impaired (SDH) subtitles</label>
-          <label class="check"><input type="checkbox" data-key="ignore_embedded"><span class="box"></span>Download even if the video already has embedded subtitles</label>
-          <label class="check"><input type="checkbox" data-key="ignore_extras"><span class="box"></span>Ignore Plex extras folders (Featurettes, Trailers, …)</label>
-        </div>
-        <div class="row"><span class="label">LANGUAGES</span><span id="lang-count" class="dim small"></span><span class="grow"></span><input type="search" id="lang-filter" placeholder="Filter…"></div>
-        <div id="languages" class="grid"></div>
-      </div>
-    </div>
-
-    <!-- Matching -->
-    <div class="page" data-page="matching">
-      <div class="page-head"><h1>Matching</h1><span class="grow"></span><span class="saved">Saved</span></div>
-      <p class="sub">Where Subliminal searches and how sure it must be.</p>
-      <div class="divider"></div>
-      <div class="scroll">
-        <div class="section"><span class="label">PROVIDERS</span><div id="providers" class="grid"></div></div>
-        <div class="section"><span class="label">REFINERS</span><div id="refiners" class="grid"></div></div>
-        <div class="section">
-          <span class="label">MATCH QUALITY</span>
-          <div class="row">Minimum score <input type="number" min="0" max="100" data-key="minimum_score"> <span class="dim small">0 = accept the best match found</span></div>
-        </div>
-        <div class="section">
-          <span class="label">OPENSUBTITLES.COM ACCOUNT</span>
-          <div class="row"><span style="width:90px">Username</span><input type="text" data-key="opensubtitles_username" autocomplete="off"></div>
-          <div class="row"><span style="width:90px">Password</span><input type="password" id="os-password" autocomplete="new-password" placeholder=""> <button class="small" id="clear-password">Clear</button></div>
-          <div class="row"><span style="width:90px">API key</span><input type="text" data-key="opensubtitles_apikey" autocomplete="off"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Config -->
+    <!-- Settings -->
     <div class="page" data-page="config">
-      <div class="page-head"><h1>Config</h1><span class="grow"></span><span class="saved">Saved</span></div>
-      <p class="sub">Subliminal, timing and performance.</p>
+      <div class="page-head"><h1>Settings</h1><span class="saved">Saved</span><span class="grow"></span><button id="view-log">View Log</button></div>
+      <p class="sub">Changes take effect right away.</p>
       <div class="divider"></div>
       <div class="scroll">
         <div class="section">
-          <span class="label">SUBLIMINAL</span>
-          <div class="row"><span id="subliminal-state"></span><span class="grow"></span><button id="reinstall" class="small">Reinstall / update</button></div>
-          <div id="subliminal-help" class="notice" style="display:none"></div>
+          <span class="label">LANGUAGES</span>
+          <div id="lang-tags" class="tags"></div>
+          <div class="row"><input type="search" id="lang-filter" placeholder="Add a language…" autocomplete="off"></div>
+          <div id="lang-matches" class="tags"></div>
+          <label class="check"><input type="checkbox" data-key="exclude_hearing_impaired"><span class="box"></span>Skip hearing-impaired (SDH) subtitles</label>
         </div>
         <div class="section">
           <span class="label">WATCHING</span>
           <div class="row">Wait until a new file stops changing for <input type="number" min="5" max="3600" data-key="settle_seconds"> seconds</div>
-          <label class="check"><input type="checkbox" data-key="catch_up"><span class="box"></span>When Jenova starts, also check files already in the folders</label>
-          <div class="row">Retry videos where nothing was found after <input type="number" min="1" max="720" data-key="retry_hours"> hours</div>
-          <label class="check"><input type="checkbox" data-key="polling"><span class="box"></span>Use polling instead of live watching</label>
-          <div class="row dim small">Live watching is instant and costs nothing while idle. Only media folders are watched (never @eaDir, #recycle, #snapshot or other DSM system folders). Jenova switches a folder to polling on its own if DSM can't watch it live.</div>
-          <div class="row small" id="live-info"></div>
-          <div class="row">Poll every <input type="number" min="30" max="86400" data-key="poll_interval_seconds"> seconds</div>
+          <label class="check"><input type="checkbox" data-key="catch_up"><span class="box"></span>Check existing files once a day</label>
+          <label class="check"><input type="checkbox" data-key="ignore_extras"><span class="box"></span>Skip Plex extras folders (Featurettes, Trailers, …)</label>
         </div>
         <div class="section">
-          <span class="label">SUBTITLE BACKUPS</span>
-          <div class="row"><span id="cleanup-text" class="dim">Older Windows versions saved copies like Movie.en.srt.bak next to your subtitles.</span><span class="grow"></span><span id="cleanup-buttons"></span></div>
+          <span class="label">DOWNLOADS</span>
+          <div class="row">Downloads at once <input type="number" min="1" max="5" data-key="concurrent_downloads"> <span class="dim small">Subtitle sites limit (and can block) apps that ask for too much at once</span></div>
+          <label class="check"><input type="checkbox" data-key="ignore_embedded"><span class="box"></span>Download even if the video has embedded subtitles</label>
         </div>
         <div class="section">
-          <span class="label">PERFORMANCE</span>
-          <div class="row">Download for up to <input type="number" min="1" max="8" data-key="concurrent_downloads"> videos at a time</div>
+          <span class="label">SUBTITLE SITES</span>
+          <div id="providers" class="grid"></div>
+          <div class="row dim small">OpenSubtitles.com login (optional, for higher download limits)</div>
+          <div class="row"><span style="width:90px">Username</span><input type="text" data-key="opensubtitles_username" autocomplete="off"></div>
+          <div class="row"><span style="width:90px">Password</span><input type="password" id="os-password" autocomplete="new-password" placeholder=""> <button class="small" id="clear-password">Clear</button></div>
+          <div class="row"><span style="width:90px">API key</span><input type="text" data-key="opensubtitles_apikey" autocomplete="off"></div>
         </div>
         <div class="section">
           <span class="label">UPDATES</span>
@@ -141,6 +108,30 @@
             </ol>
           </div>
         </div>
+        <details class="section advanced" id="advanced">
+          <summary class="label">ADVANCED</summary>
+          <div class="section">
+            <span class="label">MATCHING</span>
+            <div id="refiners" class="grid"></div>
+            <div class="row">Minimum match score <input type="number" min="0" max="100" data-key="minimum_score"> <span class="dim small">0 = accept the best match found</span></div>
+          </div>
+          <div class="section">
+            <span class="label">LIVE WATCHING</span>
+            <label class="check"><input type="checkbox" data-key="polling"><span class="box"></span>Use polling instead of live watching</label>
+            <div class="row">Poll every <input type="number" min="30" max="86400" data-key="poll_interval_seconds"> seconds</div>
+            <div class="row dim small">Live watching is instant and costs nothing while idle. Only media folders are watched (never @eaDir, #recycle, #snapshot or other DSM system folders). Jenova switches a folder to polling on its own if DSM can't watch it live.</div>
+            <div class="row small" id="live-info"></div>
+          </div>
+          <div class="section">
+            <span class="label">SUBLIMINAL</span>
+            <div class="row"><span id="subliminal-state"></span><span class="grow"></span><button id="reinstall" class="small">Reinstall / update</button></div>
+          </div>
+          <div class="section">
+            <span class="label">SUBTITLE BACKUPS</span>
+            <div class="row"><span id="cleanup-text" class="dim">Older Windows versions saved copies like Movie.en.srt.bak next to your subtitles.</span><span class="grow"></span><span id="cleanup-buttons"></span></div>
+          </div>
+        </details>
+        <div id="subliminal-help" class="notice" style="display:none"></div>
         <div class="divider"></div>
         <div class="row dim small"><span id="about"></span></div>
       </div>
@@ -148,7 +139,7 @@
 
     <!-- Log -->
     <div class="page" data-page="log">
-      <div class="page-head"><h1>Log</h1></div>
+      <div class="page-head"><h1>Log</h1><span class="grow"></span><button id="log-back">Back to Settings</button></div>
       <p class="sub">What Jenova has been doing.</p>
       <div class="divider"></div>
       <div id="log" class="scroll mono"></div>
@@ -159,8 +150,8 @@
     <nav id="menu" class="win"></nav>
     <div class="spacer"></div>
     <div class="win">
-      <div class="info-row"><span class="label">Time</span><span id="uptime">--:--:--</span></div>
-      <div class="info-row"><span class="label">Subs</span><span id="subs-total">0</span></div>
+      <div class="info-row"><span class="label">Queued</span><span id="info-queued">0</span></div>
+      <div class="info-row"><span class="label">Found today</span><span id="info-found">0</span></div>
     </div>
   </aside>
 

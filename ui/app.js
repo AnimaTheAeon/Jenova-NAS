@@ -10,10 +10,9 @@ const PROVIDERS = [
   ["podnapisi", "Podnapisi"], ["tvsubtitles", "TVSubtitles"],
 ];
 const REFINERS = [["hash", "Hash"], ["metadata", "Metadata"], ["tmdb", "TMDB"], ["tvdb", "TVDB"]];
-const PAGES = [
-  ["watch", "Watch"], ["downloads", "Downloads"], ["language", "Language"],
-  ["matching", "Matching"], ["config", "Config"], ["log", "Log"],
-];
+const PAGES = [["watch", "Watch"], ["activity", "Activity"], ["config", "Settings"]];
+/* Pages reachable without a menu entry (the log opens from Settings). */
+const HIDDEN_PAGES = { log: "config" };
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -88,20 +87,16 @@ function buildMenu() {
 }
 
 function go(id) {
-  if (!PAGES.some(([p]) => p === id)) id = "watch";
+  if (!PAGES.some(([p]) => p === id) && !HIDDEN_PAGES[id]) id = "watch";
   page = id;
-  $$(".menu-item").forEach((b) => b.classList.toggle("selected", b.dataset.go === id));
+  const menuId = HIDDEN_PAGES[id] || id;
+  $$(".menu-item").forEach((b) => b.classList.toggle("selected", b.dataset.go === menuId));
   $$(".page").forEach((p) => p.classList.toggle("active", p.dataset.page === id));
   history.replaceState(null, "", "#" + id);
   refresh();
 }
 
 // ---------- rendering ----------
-
-function fmtTime(s) {
-  const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, x = s % 60;
-  return [h, m, x].map((n) => String(n).padStart(2, "0")).join(":");
-}
 
 function folderTag(f) {
   if (!f.readable && f.state !== "offline") return ["NO ACCESS", "bad"];
@@ -121,8 +116,8 @@ function permissionHelp(f) {
 
 function renderStatus() {
   if (!status) return;
-  $("#uptime").textContent = fmtTime(status.uptime);
-  $("#subs-total").textContent = Number(status.subs_total).toLocaleString();
+  $("#info-queued").textContent = Number((status.queued || 0) + (status.running || 0)).toLocaleString();
+  $("#info-found").textContent = Number(status.found_today || 0).toLocaleString();
 
   const t = $("#watch-toggle");
   t.textContent = status.watch_enabled ? "WATCHING: ON" : "WATCHING: OFF";
@@ -134,28 +129,30 @@ function renderStatus() {
   } else {
     box.innerHTML = status.folders.map((f) => {
       const [tag, cls] = folderTag(f);
-      const letter = esc((f.name || "?").charAt(0).toUpperCase());
       const videos = f.videos ?? null, subs = f.with_subs ?? null;
       const pct = videos ? Math.round((subs / videos) * 100) : 0;
-      const active = status.watch_enabled && f.readable && f.state !== "offline";
+      const count = f.state === "offline" || !f.readable ? ""
+        : videos === null ? "Counting videos…"
+        : videos === 0 ? "No videos yet"
+        : `${Number(subs).toLocaleString()} of ${Number(videos).toLocaleString()} videos have subtitles`;
       const help = (!f.readable || !f.writable) && f.state !== "offline" ? `<div class="notice">${permissionHelp(f)}</div>`
         : f.error && f.state !== "paused" ? `<div class="notice">${esc(f.error)}</div>` : "";
       return `<div class="party">
-        <div class="emblem ${active ? "" : "off"}">${letter}</div>
         <div class="body">
           <div class="title"><span class="name">${esc(f.name)}</span><span class="tag ${cls}">${tag}</span>
             <span class="actions"><button class="small" data-remove="${esc(f.path)}">Remove</button></span></div>
           <div class="path">${esc(f.path)}</div>
           <div class="stats">
-            <span class="label">SUBS</span>
-            <span class="bar" title="How much of this folder already has subtitles in your languages"><i style="width:${pct}%"></i></span>
+            ${videos ? `<span class="bar"><i style="width:${pct}%"></i></span>` : ""}
+            <span class="dim">${count}</span>
           </div>
           ${help}
         </div></div>`;
     }).join("");
   }
   $("#check-now").disabled = !status.watch_enabled || !status.folders.length || status.scanning;
-  $("#scan-note").textContent = status.scanning ? "Counting videos…" : "";
+  $("#scan-once").disabled = status.scanning;
+  $("#scan-note").textContent = status.scanning ? "Checking…" : "";
 
   const s = status.subliminal || {};
   const stateEl = $("#subliminal-state");
@@ -242,14 +239,16 @@ function renderStatusBar() {
   const sub = s.subliminal || {};
   if (sub.state === "installing") text = "Setting up Subliminal: " + (sub.step || "…");
   else if (sub.state === "nopython") text = "Install Python 3.9 from Package Center so Jenova can download subtitles.";
-  else if (sub.state === "error") text = "Subliminal couldn't be set up. See Config.";
-  else if (s.running || s.queued) text = `Fetching subtitles: ${s.running} running, ${s.queued} waiting.`;
+  else if (sub.state === "error") text = "Subliminal couldn't be set up. See Settings → Advanced.";
+  else if (s.running || s.queued) text = s.queued ? `Getting subtitles: ${s.running} running, ${s.queued} waiting.` : `Getting subtitles for ${s.running} video(s).`;
+  else if (s.scanning) text = "Checking existing files…";
   else if (!s.watch_enabled) text = "Watching is off.";
   else if (!s.folders.length) text = "Add a folder to start watching.";
   else {
     const n = s.folders.filter((f) => f.state === "watching" || f.state === "polling").length;
     text = `Watching ${n} folder${n === 1 ? "" : "s"} for new videos.`;
     if (s.settling) text += ` ${s.settling} new file${s.settling === 1 ? "" : "s"} settling…`;
+    else if (s.retry_waiting) text += ` ${Number(s.retry_waiting).toLocaleString()} waiting for subtitles to come out.`;
   }
   $("#statusbar").textContent = text;
 }
@@ -258,14 +257,14 @@ function renderJobs(jobs) {
   const body = $("#jobs");
   $("#jobs-empty").style.display = jobs.length ? "none" : "";
   const label = {
-    found: ["Found", "good"], none: ["None found", "warn"], failed: ["Failed", "bad"],
-    running: ["Searching…", "warn"], queued: ["Waiting", "dim"], skipped: ["Already had subs", "dim"],
+    found: ["Found", "good"], none: ["Not yet", ""], failed: ["Error", "bad"],
+    running: ["Searching…", "warn"], queued: ["Queued", "warn"], skipped: ["Had subs", "dim"],
   };
   body.innerHTML = jobs.map((j) => {
     const [text, cls] = label[j.status] || [j.status, ""];
     const name = j.path.split("/").slice(-2).join(" / ");
     const langs = j.langs.length ? j.langs.map((l) => (LANGUAGES.find(([c]) => c === l) || [l, l])[1]).join(", ") : "";
-    const msg = j.status === "failed" || j.status === "none" ? `<div class="dim small">${esc(j.message)}</div>` : "";
+    const msg = j.message && j.status !== "found" ? `<div class="dim small">${esc(j.message)}</div>` : "";
     return `<tr><td class="${cls}">${text}</td><td class="file" title="${esc(j.path)}">${esc(name)}${msg}</td><td>${esc(langs)}</td><td class="when">${esc(j.time.slice(5, 16))}</td></tr>`;
   }).join("");
 }
@@ -294,7 +293,7 @@ function applyConfigToForm() {
   });
   $$("[data-list]").forEach((el) => { el.checked = (config[el.dataset.list] || []).includes(el.value); });
   $("#os-password").placeholder = config.has_password ? "•••••••• (saved)" : "";
-  $("#lang-count").textContent = `${config.languages.length} selected`;
+  renderLanguages();
 }
 
 let saveTimer = null;
@@ -317,8 +316,27 @@ async function flushSave() {
   }
 }
 
+const langName = (code) => (LANGUAGES.find(([c]) => c === code) || [code, code])[1];
+
+function renderLanguages() {
+  const langs = config.languages || [];
+  $("#lang-tags").innerHTML = langs.length
+    ? langs.map((c) => `<button class="tag-btn" data-lang-remove="${esc(c)}" title="Remove">${esc(langName(c))} ×</button>`).join("")
+    : `<span class="warn">No languages yet, so nothing will be downloaded.</span>`;
+  const q = $("#lang-filter").value.trim().toLowerCase();
+  const matches = q ? LANGUAGES.filter(([c, n]) => !langs.includes(c) && (n.toLowerCase().includes(q) || c === q)).slice(0, 8) : [];
+  $("#lang-matches").innerHTML = !q ? "" : matches.length
+    ? matches.map(([c, n]) => `<button class="small" data-lang-add="${esc(c)}">+ ${esc(n)}</button>`).join("")
+    : `<span class="dim small">No match</span>`;
+}
+
+function setLanguages(langs) {
+  config.languages = langs;
+  renderLanguages();
+  queueSave({ languages: langs });
+}
+
 function wireSettings() {
-  buildChecklist($("#languages"), LANGUAGES, "languages");
   buildChecklist($("#providers"), PROVIDERS, "providers");
   buildChecklist($("#refiners"), REFINERS, "refiners");
   document.addEventListener("change", (e) => {
@@ -329,7 +347,6 @@ function wireSettings() {
     } else if (el.dataset.list) {
       const key = el.dataset.list;
       const values = $$(`[data-list="${key}"]`).filter((x) => x.checked).map((x) => x.value);
-      if (key === "languages" && !values.length) { el.checked = true; return; }
       queueSave({ [key]: values });
     } else if (el.id === "os-password" && el.value) {
       queueSave({ opensubtitles_password: el.value });
@@ -337,15 +354,32 @@ function wireSettings() {
     }
   });
   $("#clear-password").onclick = () => queueSave({ clear_password: true });
-  $("#lang-filter").oninput = (e) => {
-    const q = e.target.value.trim().toLowerCase();
-    $$("#languages label").forEach((l) => { l.style.display = !q || l.dataset.name.includes(q) ? "" : "none"; });
+  $("#lang-filter").oninput = renderLanguages;
+  $("#lang-filter").onkeydown = (e) => {
+    if (e.key !== "Enter") return;
+    const first = $("#lang-matches [data-lang-add]");
+    if (first) first.click();
   };
+  $("#lang-matches").onclick = (e) => {
+    const b = e.target.closest("[data-lang-add]");
+    if (!b) return;
+    $("#lang-filter").value = "";
+    setLanguages([...config.languages, b.dataset.langAdd]);
+  };
+  $("#lang-tags").onclick = (e) => {
+    const b = e.target.closest("[data-lang-remove]");
+    if (b) setLanguages(config.languages.filter((c) => c !== b.dataset.langRemove));
+  };
+  const adv = $("#advanced");
+  try { adv.open = localStorage.getItem("jenova-advanced") === "1"; } catch (e) { /* ignore */ }
+  adv.addEventListener("toggle", () => { try { localStorage.setItem("jenova-advanced", adv.open ? "1" : "0"); } catch (e) { /* ignore */ } });
 }
 
 // ---------- folder picker ----------
 
 let pickerPath = "";
+/* "watch" adds the folder; "scan" checks it once. */
+let pickerMode = "watch";
 async function openPicker(path = "") {
   try {
     const data = await api("browse?path=" + encodeURIComponent(path));
@@ -354,6 +388,7 @@ async function openPicker(path = "") {
     $("#picker-up").disabled = data.parent === null || data.parent === undefined;
     $("#picker-up").dataset.parent = data.parent ?? "";
     $("#picker-choose").disabled = !data.path;
+    $("#picker-choose").textContent = pickerMode === "scan" ? "Scan this folder once" : "Watch this folder";
     const list = $("#picker-list");
     list.innerHTML = data.entries.map((e) =>
       `<div class="picker-item" data-path="${esc(e.path)}">📁 <span>${esc(e.name)}</span>${e.readable ? "" : ' <span class="bad small">no access</span>'}${e.volume ? `<span class="vol">${esc(e.volume)}</span>` : ""}</div>`).join("")
@@ -366,7 +401,8 @@ async function openPicker(path = "") {
 }
 
 function wirePicker() {
-  $("#add-folder").onclick = () => openPicker("");
+  $("#add-folder").onclick = () => { pickerMode = "watch"; openPicker(""); };
+  $("#scan-once").onclick = () => { pickerMode = "scan"; openPicker(""); };
   $("#picker-list").onclick = (e) => {
     const item = e.target.closest("[data-path]");
     if (item) openPicker(item.dataset.path);
@@ -375,9 +411,15 @@ function wirePicker() {
   $("#picker-cancel").onclick = () => $("#picker").classList.remove("open");
   $("#picker-choose").onclick = async () => {
     try {
-      await api("folders/add", { path: pickerPath });
-      $("#picker").classList.remove("open");
-      refreshStatus();
+      if (pickerMode === "scan") {
+        await api("scan", { path: pickerPath });
+        $("#picker").classList.remove("open");
+        go("activity");
+      } else {
+        await api("folders/add", { path: pickerPath });
+        $("#picker").classList.remove("open");
+        refreshStatus();
+      }
     } catch (e) {
       const note = $("#picker-note");
       note.textContent = e.message;
@@ -398,6 +440,8 @@ function wireActions() {
       refreshStatus();
     }
   };
+  $("#view-log").onclick = () => go("log");
+  $("#log-back").onclick = () => go("config");
   $("#clear-jobs").onclick = async () => { await api("jobs/clear", {}); refresh(); };
   $("#update-check").onclick = async () => { await api("update/check", {}); refreshStatus(); setTimeout(refreshStatus, 3000); };
   $("#update-command").onclick = (e) => e.target.select();
@@ -420,7 +464,7 @@ async function refreshStatus() {
 async function refresh() {
   await refreshStatus();
   try {
-    if (page === "downloads") renderJobs((await api("jobs")).jobs);
+    if (page === "activity") renderJobs((await api("jobs")).jobs);
     if (page === "log") renderLog((await api("log")).lines);
   } catch (e) { /* ignore */ }
 }

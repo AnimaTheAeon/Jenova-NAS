@@ -21,6 +21,39 @@ use crate::{debug, info, warn};
 
 const MAX_JOBS: usize = 300;
 const TICK: Duration = Duration::from_secs(1);
+/// While idle, wake this often to see whether any retries are due.
+const IDLE_WAKE: Duration = Duration::from_secs(10 * 60);
+/// Waits after the 1st, 2nd, 3rd… time nothing was found; then weekly.
+const RETRY_HOURS: &[u64] = &[6, 24, 72, 168];
+/// Existing files are checked at most this often.
+const FULL_CHECK_EVERY: u64 = 24 * 3600;
+
+/// Wait before trying again after `attempts` misses.
+pub fn retry_wait(attempts: u32) -> u64 {
+    let i = (attempts.max(1) as usize - 1).min(RETRY_HOURS.len() - 1);
+    RETRY_HOURS[i] * 3600
+}
+
+/// "6 h", "1 day", "3 days", "1 week".
+pub fn describe_wait(secs: u64) -> String {
+    match secs / 3600 {
+        h if h < 24 => format!("{h} h"),
+        24 => "1 day".into(),
+        168 => "1 week".into(),
+        h => format!("{} days", h / 24),
+    }
+}
+
+/// Where a video came from; decides its place in the queue.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Origin {
+    /// Just arrived: goes to the front of the queue.
+    New,
+    /// Found by checking existing files.
+    Existing,
+    /// Nothing was found before and its retry time has come.
+    Retry,
+}
 
 // ---------- shared state ----------
 
@@ -52,6 +85,12 @@ struct Record {
     mtime: i64,
     found: bool,
     at: u64,
+    /// Times nothing was found in a row.
+    #[serde(default)]
+    attempts: u32,
+    /// Unix seconds when to try again (misses only).
+    #[serde(default)]
+    next_try: u64,
 }
 
 pub struct Shared {
@@ -68,6 +107,10 @@ pub struct Shared {
     /// Folders currently watched live, and DSM's per-user limit.
     pub live_watches: AtomicUsize,
     pub watch_limit: AtomicUsize,
+    /// Videos waiting for their retry time.
+    pub retry_waiting: AtomicUsize,
+    /// (day number, videos that got subtitles that day).
+    found_today: Mutex<(u64, usize)>,
     pub started: Instant,
     pub cleanup: Mutex<Cleanup>,
     history: Mutex<HashMap<String, Record>>,
@@ -81,6 +124,26 @@ impl Shared {
         if let Some(tx) = self.tx.lock().unwrap_or_else(|e| e.into_inner()).as_ref() {
             let _ = tx.send(msg);
         }
+    }
+
+    /// Videos that got subtitles today (UTC day).
+    pub fn found_today(&self) -> usize {
+        let slot = self.found_today.lock().unwrap_or_else(|e| e.into_inner());
+        if slot.0 == now_secs() / 86_400 { slot.1 } else { 0 }
+    }
+
+    fn count_found(&self) {
+        let day = now_secs() / 86_400;
+        let mut slot = self.found_today.lock().unwrap_or_else(|e| e.into_inner());
+        if slot.0 != day {
+            *slot = (day, 0);
+        }
+        slot.1 += 1;
+    }
+
+    /// One-off check of a folder that doesn't have to be watched.
+    pub fn scan_once(&self, folder: String) {
+        self.send(Msg::ScanOnce(folder));
     }
 
     pub fn subs_found_total(&self) -> usize {
@@ -200,6 +263,7 @@ impl Cleanup {
 pub enum Msg {
     Configure,
     CheckNow,
+    ScanOnce(String),
     InstallSubliminal,
     SubliminalReady,
     Fs(notify::Result<notify::Event>),
@@ -276,6 +340,7 @@ pub fn start() -> Arc<Shared> {
         .and_then(|b| serde_json::from_slice(&b).ok())
         .unwrap_or_default();
 
+    let waiting = history.values().filter(|r| !r.found).count();
     let (tx, rx) = mpsc::channel();
     let shared = Arc::new(Shared {
         config: RwLock::new(config),
@@ -290,6 +355,8 @@ pub fn start() -> Arc<Shared> {
         scanning: AtomicUsize::new(0),
         live_watches: AtomicUsize::new(0),
         watch_limit: AtomicUsize::new(read_watch_limit()),
+        retry_waiting: AtomicUsize::new(waiting),
+        found_today: Mutex::new((0, 0)),
         started: Instant::now(),
         cleanup: Mutex::new(Cleanup::Idle),
         history: Mutex::new(history),
@@ -317,7 +384,7 @@ struct Candidate {
     size: u64,
     mtime: i64,
     last_change: Instant,
-    existing: bool,
+    origin: Origin,
 }
 
 struct Engine {
@@ -338,6 +405,9 @@ struct Engine {
     known_videos: HashSet<PathBuf>,
     next_id: u64,
     installing: bool,
+    /// Unix seconds of the last full check of existing files.
+    last_full_check: u64,
+    last_retry_check: Instant,
 }
 
 impl Engine {
@@ -357,6 +427,9 @@ impl Engine {
             known_videos: HashSet::new(),
             next_id: 1,
             installing: false,
+            last_full_check: read_state().last_full_check,
+            // First retry check a minute after start.
+            last_retry_check: Instant::now() - IDLE_WAKE + Duration::from_secs(60),
         }
     }
 
@@ -375,14 +448,17 @@ impl Engine {
                     Err(RecvTimeoutError::Disconnected) => break,
                 }
             } else {
-                match rx.recv() {
+                // Idle: wake now and then for retries and the daily check.
+                match rx.recv_timeout(IDLE_WAKE) {
                     Ok(msg) => Some(msg),
-                    Err(_) => break,
+                    Err(RecvTimeoutError::Timeout) => None,
+                    Err(RecvTimeoutError::Disconnected) => break,
                 }
             };
             if let Some(msg) = msg {
                 self.handle(msg);
             }
+            self.periodic();
             self.evaluate_candidates();
             self.dispatch();
             self.publish_counts();
@@ -392,7 +468,11 @@ impl Engine {
     fn handle(&mut self, msg: Msg) {
         match msg {
             Msg::Configure => self.configure(),
-            Msg::CheckNow => self.scan_all(true),
+            Msg::CheckNow => self.full_check(),
+            Msg::ScanOnce(folder) => {
+                info!("Checking {folder} once");
+                self.scan_folder(folder, true);
+            }
             Msg::InstallSubliminal => self.ensure_subliminal(),
             Msg::SubliminalReady => {
                 self.installing = false;
@@ -400,7 +480,7 @@ impl Engine {
             Msg::Fs(event) => self.on_event(event),
             Msg::Polled(paths) => {
                 for path in paths {
-                    self.add_candidate(path, false);
+                    self.add_candidate(path, Origin::New);
                 }
             }
             Msg::Found {
@@ -423,7 +503,7 @@ impl Engine {
                 if queue {
                     let mut added = 0;
                     for video in videos {
-                        if self.add_candidate(video, true) {
+                        if self.add_candidate(video, Origin::Existing) {
                             added += 1;
                         }
                     }
@@ -652,15 +732,77 @@ impl Engine {
             info!("Watching is paused");
         }
 
-        // Count (and on first start, catch up on) folders.
+        // Count folders; on first start also check existing files, but
+        // only if that hasn't happened in the last day.
         if first_start {
-            self.scan_all(config.catch_up);
+            let due = now_secs().saturating_sub(self.last_full_check) >= FULL_CHECK_EVERY;
+            if config.catch_up && due {
+                self.full_check();
+            } else {
+                self.scan_all(false);
+            }
         } else {
             for folder in newly_added {
                 self.scan_folder(folder, config.catch_up);
             }
         }
         self.active = wanted;
+    }
+
+    /// Check every watched folder for videos missing subtitles.
+    fn full_check(&mut self) {
+        self.last_full_check = now_secs();
+        write_state(&State { last_full_check: self.last_full_check });
+        info!("Checking existing files");
+        self.scan_all(true);
+    }
+
+    /// Retries that are due, and the daily check.
+    fn periodic(&mut self) {
+        if self.last_retry_check.elapsed() >= IDLE_WAKE {
+            self.last_retry_check = Instant::now();
+            self.queue_due_retries();
+        }
+        let config = self.config();
+        if config.watch_enabled
+            && config.catch_up
+            && !self.active.is_empty()
+            && self.shared.scanning.load(Ordering::SeqCst) == 0
+            && now_secs().saturating_sub(self.last_full_check) >= FULL_CHECK_EVERY
+        {
+            self.full_check();
+        }
+    }
+
+    fn queue_due_retries(&mut self) {
+        let config = self.config();
+        if !config.watch_enabled {
+            return;
+        }
+        let now = now_secs();
+        let (due, waiting): (Vec<PathBuf>, usize) = {
+            let history = self.shared.history.lock().unwrap_or_else(|e| e.into_inner());
+            let misses: Vec<(&String, &Record)> = history.iter().filter(|(_, r)| !r.found).collect();
+            let due = misses
+                .iter()
+                .filter(|(_, r)| r.next_try <= now)
+                .map(|(k, _)| PathBuf::from(k))
+                .filter(|p| self.active.iter().any(|f| p.starts_with(f)))
+                .collect();
+            (due, misses.len())
+        };
+        self.shared.retry_waiting.store(waiting, Ordering::SeqCst);
+        let due: Vec<PathBuf> = due.into_iter().filter(|p| p.is_file()).collect();
+        if due.is_empty() {
+            return;
+        }
+        info!("Trying {} video(s) again", due.len());
+        for path in due {
+            if let Some((size, mtime)) = fingerprint(&path) {
+                let c = Candidate { size, mtime, last_change: Instant::now(), origin: Origin::Retry };
+                self.consider(path, c, &config);
+            }
+        }
     }
 
     fn scan_all(&mut self, queue: bool) {
@@ -823,17 +965,17 @@ impl Engine {
                 }
                 // A folder moved in produces no events for its contents.
                 for video in walk_videos(&path, ignore_extras) {
-                    self.add_candidate(video, false);
+                    self.add_candidate(video, Origin::New);
                 }
             } else if is_video_file(&path) {
-                self.add_candidate(path, false);
+                self.add_candidate(path, Origin::New);
             }
         }
         self.shared.live_watches.store(self.live_dirs.len(), Ordering::SeqCst);
     }
 
     /// Returns true if newly added.
-    fn add_candidate(&mut self, path: PathBuf, existing: bool) -> bool {
+    fn add_candidate(&mut self, path: PathBuf, origin: Origin) -> bool {
         if self.queued.contains(&path) {
             return false;
         }
@@ -842,9 +984,9 @@ impl Engine {
         };
         let now = Instant::now();
         if let Some(c) = self.candidates.get_mut(&path) {
-            if !existing {
+            if origin == Origin::New {
                 c.last_change = now;
-                c.existing = false;
+                c.origin = Origin::New;
             }
             return false;
         }
@@ -854,7 +996,7 @@ impl Engine {
                 size,
                 mtime,
                 last_change: now,
-                existing,
+                origin,
             },
         );
         true
@@ -880,7 +1022,7 @@ impl Engine {
                 c.last_change = now;
                 continue;
             }
-            let age_ok = if c.existing {
+            let age_ok = if c.origin != Origin::New {
                 // Files from a scan only need to be old enough.
                 (now_secs() as i64 - mtime) >= settle.as_secs() as i64
                     || now.duration_since(c.last_change) >= settle
@@ -918,11 +1060,18 @@ impl Engine {
                 .map(SubtitleUtils::list_subtitle_files_in_folder)
                 .unwrap_or_default(),
         );
+        let key = path.to_string_lossy().into_owned();
         if !missing {
+            // Got subtitles some other way: stop retrying it.
+            let mut history = self.shared.history.lock().unwrap_or_else(|e| e.into_inner());
+            if history.get(&key).is_some_and(|r| !r.found) {
+                history.remove(&key);
+                self.save_history(&history);
+            }
             return;
         }
-        // Skip what was already handled (unless the file changed).
-        let key = path.to_string_lossy().into_owned();
+        // Skip what was handled already (unless the file changed); videos
+        // with nothing online yet wait for their retry time.
         if let Some(record) = self
             .shared
             .history
@@ -931,14 +1080,17 @@ impl Engine {
             .get(&key)
         {
             let same_file = record.size == c.size && record.mtime == c.mtime;
-            let recent = now_secs().saturating_sub(record.at) < config.retry_hours * 3600;
-            if same_file && (record.found || recent) {
+            let waiting = c.origin != Origin::Retry && now_secs() < record.next_try;
+            if same_file && (record.found || waiting) {
+                if c.origin == Origin::New && !record.found {
+                    info!("{}: waiting to retry", display_name(&path));
+                }
                 return;
             }
         }
         let id = self.next_id;
         self.next_id += 1;
-        if !c.existing {
+        if c.origin == Origin::New {
             info!("New video: {}", display_name(&path));
         }
         self.push_job(Job {
@@ -946,11 +1098,19 @@ impl Engine {
             path: key,
             status: "queued".into(),
             langs: Vec::new(),
-            message: String::new(),
+            message: match c.origin {
+                Origin::New => "New arrival".into(),
+                Origin::Existing => "Missing subtitles".into(),
+                Origin::Retry => "Trying again".into(),
+            },
             time: crate::log::timestamp(),
         });
         self.queued.insert(path.clone());
-        self.queue.push_back((id, path));
+        if c.origin == Origin::New {
+            self.queue.push_front((id, path));
+        } else {
+            self.queue.push_back((id, path));
+        }
     }
 
     fn push_job(&self, job: Job) {
@@ -1026,7 +1186,7 @@ impl Engine {
                     j.status = "skipped".into();
                     j.message = "Already has subtitles".into();
                 });
-                self.remember(&path, true);
+                let _ = self.remember(&path, true);
                 continue;
             }
             if !path.exists() {
@@ -1066,13 +1226,25 @@ impl Engine {
             "failed"
         };
         let name = display_name(&path);
+        let mut message = message;
         if found {
             info!("{name}: subtitles found ({})", found_langs.join(", "));
             self.bump_folder_counts(&path, 0, 1);
-        } else if ok {
-            info!("{name}: no subtitles found");
-        } else {
-            warn!("{name}: {message}");
+            self.shared.count_found();
+        }
+        let wait = self.remember(&path, found);
+        if !found {
+            if ok {
+                message = "No subtitles online yet".into();
+            }
+            if let Some(wait) = wait {
+                message = format!("{message} · retrying in {}", describe_wait(wait));
+            }
+            if ok {
+                info!("{name}: {message}");
+            } else {
+                warn!("{name}: {message}");
+            }
         }
         self.update_job(id, |j| {
             j.status = status.into();
@@ -1080,24 +1252,40 @@ impl Engine {
             j.message = message;
             j.time = crate::log::timestamp();
         });
-        self.remember(&path, found);
     }
 
-    fn remember(&self, path: &Path, found: bool) {
-        if let Some((size, mtime)) = fingerprint(path) {
-            let mut history = self.shared.history.lock().unwrap_or_else(|e| e.into_inner());
-            history.insert(
-                path.to_string_lossy().into_owned(),
-                Record {
-                    size,
-                    mtime,
-                    found,
-                    at: now_secs(),
-                },
-            );
-            if let Ok(json) = serde_json::to_vec(&*history) {
-                let _ = crate::config::write_atomic(&self.shared.history_path, &json);
-            }
+    /// Record the outcome. For a miss, returns the wait before the next try.
+    fn remember(&self, path: &Path, found: bool) -> Option<u64> {
+        let (size, mtime) = fingerprint(path)?;
+        let key = path.to_string_lossy().into_owned();
+        let mut history = self.shared.history.lock().unwrap_or_else(|e| e.into_inner());
+        let now = now_secs();
+        let attempts = match history.get(&key) {
+            Some(r) if !found && !r.found && r.size == size && r.mtime == mtime => r.attempts + 1,
+            _ if found => 0,
+            _ => 1,
+        };
+        let wait = (!found).then(|| retry_wait(attempts));
+        history.insert(
+            key,
+            Record {
+                size,
+                mtime,
+                found,
+                at: now,
+                attempts,
+                next_try: wait.map(|w| now + w).unwrap_or(0),
+            },
+        );
+        self.save_history(&history);
+        let waiting = history.values().filter(|r| !r.found).count();
+        self.shared.retry_waiting.store(waiting, Ordering::SeqCst);
+        wait
+    }
+
+    fn save_history(&self, history: &HashMap<String, Record>) {
+        if let Ok(json) = serde_json::to_vec(history) {
+            let _ = crate::config::write_atomic(&self.shared.history_path, &json);
         }
     }
 
@@ -1180,6 +1368,25 @@ fn download(python: &str, video: &Path, config: &Config, cancel: &AtomicBool) ->
         out.summary
     };
     (langs, out.success || !changed.is_empty(), message)
+}
+
+#[derive(Serialize, Deserialize, Default)]
+struct State {
+    #[serde(default)]
+    last_full_check: u64,
+}
+
+fn read_state() -> State {
+    std::fs::read(var_dir().join("state.json"))
+        .ok()
+        .and_then(|b| serde_json::from_slice(&b).ok())
+        .unwrap_or_default()
+}
+
+fn write_state(state: &State) {
+    if let Ok(json) = serde_json::to_vec(state) {
+        let _ = crate::config::write_atomic(&var_dir().join("state.json"), &json);
+    }
 }
 
 /// DSM's per-user live-watch limit (fs.inotify.max_user_watches).
