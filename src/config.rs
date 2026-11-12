@@ -77,6 +77,8 @@ pub struct Config {
     pub concurrent_downloads: usize,
     /// Let the Task Scheduler task install new versions from GitHub.
     pub auto_update: bool,
+    /// Window look: "ff" (FFVII menu) or "green" (Box of X).
+    pub theme: String,
 }
 
 impl Default for Config {
@@ -100,6 +102,7 @@ impl Default for Config {
             poll_interval_seconds: 300,
             concurrent_downloads: 3,
             auto_update: true,
+            theme: "ff".into(),
         }
     }
 }
@@ -111,6 +114,9 @@ impl Config {
         self.poll_interval_seconds = self.poll_interval_seconds.clamp(30, 86_400);
         self.concurrent_downloads = self.concurrent_downloads.clamp(1, MAX_CONCURRENT_DOWNLOADS);
         self.minimum_score = self.minimum_score.min(100);
+        if self.theme != "green" {
+            self.theme = "ff".into();
+        }
         self.providers.retain(|p| PROVIDERS.contains(&p.as_str()));
         self.refiners.retain(|r| REFINERS.contains(&r.as_str()));
         self.languages.retain(|l| {
