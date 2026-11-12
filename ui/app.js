@@ -458,7 +458,10 @@ function wireActions() {
 // ---------- polling ----------
 
 async function refreshStatus() {
-  try { status = await api("status"); renderStatus(); } catch (e) { /* shown via overlay */ }
+  try { status = await api("status"); } catch (e) { return; /* shown via overlay */ }
+  try { renderStatus(); } catch (e) {
+    $("#statusbar").textContent = "Display error: " + e.message + " — press Ctrl+F5 to reload Jenova.";
+  }
 }
 
 async function refresh() {
@@ -486,7 +489,9 @@ document.addEventListener("visibilitychange", () => { if (document.visibilitySta
   try {
     config = await api("config");
     applyConfigToForm();
-  } catch (e) { /* overlay */ }
+  } catch (e) {
+    if (e.message !== "auth" && e.message !== "down") $("#statusbar").textContent = "Couldn't load settings: " + e.message;
+  }
   await refresh();
   schedule();
 })();

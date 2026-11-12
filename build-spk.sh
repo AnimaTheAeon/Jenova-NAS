@@ -15,6 +15,8 @@ mkdir -p "$WORK/pkg/bin" "$WORK/pkg/ui"
 install -m 755 "$BIN" "$WORK/pkg/bin/jenova-nas"
 cp -R "$HERE/ui/." "$WORK/pkg/ui/"
 chmod 755 "$WORK/pkg/ui/api.cgi"
+# Make browsers fetch this version's files instead of cached old ones.
+sed -i "s/@VERSION@/$VERSION/g" "$WORK/pkg/ui/index.html" "$WORK/pkg/ui/Jenova.js"
 (cd "$WORK/pkg" && tar --owner=0 --group=0 -czf "$WORK/package.tgz" bin ui)
 
 # spk layout
