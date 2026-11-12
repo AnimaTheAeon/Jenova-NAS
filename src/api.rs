@@ -175,6 +175,15 @@ fn handle(mut req: Request, shared: &Arc<Shared>, cache: &AuthCache) {
             shared.send(Msg::CheckNow);
             Ok(json!({ "ok": true }))
         }
+        (true, "scan") => {
+            let path = input.get("path").and_then(Value::as_str).unwrap_or("").trim_end_matches('/').to_string();
+            if !inside_volume(Path::new(&path)) || !Path::new(&path).is_dir() {
+                Err("Pick a folder on one of the NAS volumes".into())
+            } else {
+                shared.scan_once(path);
+                Ok(json!({ "ok": true }))
+            }
+        }
         (false, "jobs") => Ok(jobs(shared)),
         (true, "jobs/clear") => {
             shared.clear_finished_jobs();
@@ -244,6 +253,8 @@ fn status(shared: &Arc<Shared>) -> Value {
         "live_watches": shared.live_watches.load(Ordering::SeqCst),
         "watch_limit": shared.watch_limit.load(Ordering::SeqCst),
         "subs_total": shared.subs_found_total(),
+        "found_today": shared.found_today(),
+        "retry_waiting": shared.retry_waiting.load(Ordering::SeqCst),
         "cleanup": shared.cleanup.lock().unwrap_or_else(|e| e.into_inner()).to_json(),
         "user": std::env::var("USER").unwrap_or_default(),
         "update": crate::update::status_json(),

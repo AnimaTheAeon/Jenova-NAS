@@ -55,6 +55,13 @@ GitHub Actions builds and tests every push. Bumping `version` in `Cargo.toml` an
 - [Subliminal](https://github.com/Diaoul/subliminal): subtitle search and download.
 - Menu font: [Nunito](https://github.com/googlefonts/nunito) (SIL Open Font License, `ui/fonts/Nunito-OFL.txt`).
 
+## How it works
+
+- Three pages: **Watch** (folders, Check existing files, Scan a folder once), **Activity** (what Jenova looked at and the result) and **Settings** (languages, watching, downloads, subtitle sites, updates; technical options under **Advanced**; **View Log** at the top).
+- New arrivals go to the front of the queue. Up to 3 downloads run at once by default (5 at most).
+- When nothing is online yet, the video is tried again after 6 hours, then 1 day, 3 days, and weekly after that.
+- Existing files are checked at most once a day, so restarts don't re-search the library.
+
 ## Automatic updates
 
 Jenova checks GitHub twice a day and shows what's available on its **Config** page. DSM only lets packages install updates through a root scheduled task, so set this up once:

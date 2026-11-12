@@ -47,6 +47,7 @@ pub const PROVIDERS: &[&str] = &[
     "podnapisi",
     "tvsubtitles",
 ];
+pub const MAX_CONCURRENT_DOWNLOADS: usize = 5;
 pub const REFINERS: &[&str] = &["hash", "metadata", "tmdb", "tvdb"];
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -72,9 +73,8 @@ pub struct Config {
     /// Poll instead of using inotify (always used as a fallback if needed).
     pub polling: bool,
     pub poll_interval_seconds: u64,
+    /// Subtitle sites limit (and can block) clients that ask too much at once.
     pub concurrent_downloads: usize,
-    /// Retry videos where nothing was found after this many hours.
-    pub retry_hours: u64,
     /// Let the Task Scheduler task install new versions from GitHub.
     pub auto_update: bool,
 }
@@ -98,8 +98,7 @@ impl Default for Config {
             catch_up: true,
             polling: false,
             poll_interval_seconds: 300,
-            concurrent_downloads: 2,
-            retry_hours: 24,
+            concurrent_downloads: 3,
             auto_update: true,
         }
     }
@@ -110,9 +109,8 @@ impl Config {
     pub fn normalize(&mut self) {
         self.settle_seconds = self.settle_seconds.clamp(5, 3600);
         self.poll_interval_seconds = self.poll_interval_seconds.clamp(30, 86_400);
-        self.concurrent_downloads = self.concurrent_downloads.clamp(1, 8);
+        self.concurrent_downloads = self.concurrent_downloads.clamp(1, MAX_CONCURRENT_DOWNLOADS);
         self.minimum_score = self.minimum_score.min(100);
-        self.retry_hours = self.retry_hours.clamp(1, 24 * 30);
         self.providers.retain(|p| PROVIDERS.contains(&p.as_str()));
         self.refiners.retain(|r| REFINERS.contains(&r.as_str()));
         self.languages.retain(|l| {
@@ -234,7 +232,7 @@ mod tests {
         assert_eq!(c.providers, vec!["podnapisi"]);
         assert_eq!(c.languages, vec!["en"]);
         assert_eq!(c.settle_seconds, 5);
-        assert_eq!(c.concurrent_downloads, 8);
+        assert_eq!(c.concurrent_downloads, 5);
     }
 
     #[test]

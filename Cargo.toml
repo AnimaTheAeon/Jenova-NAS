@@ -1,6 +1,6 @@
 [package]
 name = "jenova-nas"
-version = "1.0.7"
+version = "1.1.0"
 edition = "2021"
 description = "Jenova for Synology DSM: watches folders and downloads subtitles for new videos."
 license = "MIT"
