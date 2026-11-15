@@ -86,6 +86,212 @@ function buildMenu() {
   go(location.hash.slice(1) || "watch");
 }
 
+// ---------- Blades look ----------
+// Glossy silver blades; the open one wears its page's color. The page itself
+// (#main) moves into the open blade, so every page works as before.
+// Same look as Turks and Lifestream's NAS pages.
+
+const isBlades = () => document.body.classList.contains("blades");
+const calm = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+let bstage = null, bcur = 0, bdrag = null, bcontour = null;
+const BARROW = (d) => `<svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16"><path d="${d}" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+function bladesBuild() {
+  if (bstage) return;
+  bstage = document.createElement("div");
+  bstage.id = "bstage";
+  bstage.setAttribute("aria-label", "Blades");
+  document.body.insertBefore(bstage, $(".layout"));
+  const make = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
+  const nav = (dir, label, d) => { const b = make("button", "bnav", BARROW(d)); b.dataset.dir = dir; b.setAttribute("aria-label", label); b.onclick = () => bladesStep(dir); return b; };
+  PAGES.forEach(([key, label]) => {
+    const sec = make("section", "bsec k-" + key);
+    sec.setAttribute("aria-label", label);
+    const tab = make("button", "btab");
+    tab.setAttribute("aria-label", label);
+    tab.onclick = () => { if ((HIDDEN_PAGES[page] || page) !== key) go(key); };
+    tab.append(make("span", "blabel", esc(label.toLowerCase())));
+    const band = make("div", "bband", `<h1>${esc(label)}</h1><span class="bchip" title="Open ${esc(PAGES[0][1])}"><span class="bdot"></span><span class="btxt"></span></span><span class="bspeed"></span>`);
+    $(".bchip", band).onclick = () => { if ((HIDDEN_PAGES[page] || page) !== PAGES[0][0]) go(PAGES[0][0]); };
+    const foot = make("div", "bfoot", '<span class="bkey bhint">← →</span><span class="bhint">Blades</span><span class="bkey bhint">ENTER</span><span class="bhint">Select</span><span class="bkey bhint">ESC</span><span class="bhint">Back</span>');
+    const navs = make("span", "bnavs");
+    navs.append(nav(-1, "Previous blade", "M10 3 L5 8 L10 13"), nav(1, "Next blade", "M6 3 L11 8 L6 13"));
+    foot.append(navs);
+    const panel = make("div", "bpanel");
+    panel.append(band, make("div", "bbody"), foot);
+    const wrap = make("div", "bwrap");
+    wrap.append(panel);
+    sec.append(tab, wrap);
+    bstage.append(sec);
+  });
+  const edge = make("div", "bedge");
+  edge.setAttribute("aria-hidden", "true");
+  bstage.append(edge);
+  bcontour = bladesContour(bstage, ".bsec.open .bbody", ".bpanel");
+  // Swipe sideways: anywhere with a finger, or from a tab or the top band with the mouse.
+  bstage.addEventListener("pointerdown", (e) => { bdrag = { x: e.clientX, y: e.clientY, ok: e.pointerType === "touch" || !!e.target.closest(".btab, .bband") }; });
+  bstage.addEventListener("pointerup", (e) => {
+    if (!bdrag || !bdrag.ok) { bdrag = null; return; }
+    const dx = e.clientX - bdrag.x, dy = e.clientY - bdrag.y; bdrag = null;
+    if (Math.abs(dx) > 70 && Math.abs(dy) < 60) bladesStep(dx < 0 ? 1 : -1);
+  });
+}
+
+// Blades: rows follow the open blade"s curved left edge. Each row shifts
+// right by how far the curve comes in at its height (the most it comes in
+// over the row"s span), so nothing runs into the curve near the top and
+// bottom. Re-run on scroll, resize and page changes.
+function bladesContour(stage, bodySel, panelSel) {
+  let queued = false, shifted = new Set();
+  const visible = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+  // Children, looking through display: contents wrappers (they have no box).
+  const kidsOf = (el) => [...el.children].flatMap((c) => (getComputedStyle(c).display === 'contents' ? kidsOf(c) : visible(c) ? [c] : []));
+  const pick = (el, out) => {
+    if (!visible(el)) return;
+    const h = el.getBoundingClientRect().height;
+    const kids = kidsOf(el);
+    const t0 = kids.length ? kids[0].getBoundingClientRect().top : 0;
+    const stacked = kids.length > 1 && kids.some((k) => Math.abs(k.getBoundingClientRect().top - t0) > 4);
+    if (h > 90 && (stacked || kids.length === 1)) kids.forEach((k) => pick(k, out));
+    else if (h > 90 && kids.length > 1) {
+      // Side-by-side columns: only the leftmost one meets the curve.
+      const left = kids.reduce((a, b) => (b.getBoundingClientRect().left < a.getBoundingClientRect().left ? b : a));
+      pick(left, out);
+    } else out.push(el);
+  };
+  const run = () => {
+    queued = false;
+    const open = stage.querySelector(bodySel);
+    const panel = open && open.closest(panelSel);
+    const next = new Set();
+    if (open && panel) {
+      const pr = panel.getBoundingClientRect(), br = open.getBoundingClientRect();
+      const r = parseFloat(getComputedStyle(stage).getPropertyValue("--r")) || 44;
+      const mid = pr.top + pr.height / 2, half = pr.height / 2;
+      const arc = (y) => { const d = Math.max(-1, Math.min(1, (y - mid) / half)); return r * (1 - Math.sqrt(1 - d * d)); };
+      const rows = [];
+      [...open.children].forEach((c) => pick(c, rows));
+      for (const el of rows) {
+        shiftRow(el, 0);
+        const er = el.getBoundingClientRect();
+        const top = Math.max(er.top, br.top), bot = Math.min(er.bottom, br.bottom);
+        if (bot <= top) continue;
+        const dx = Math.round(Math.max(arc(top), arc(bot)));
+        if (dx > 0) { shiftRow(el, dx); next.add(el); }
+      }
+    }
+    shifted.forEach((el) => { if (!next.has(el)) shiftRow(el, 0); });
+    shifted = next;
+  };
+  const queue = () => { if (!queued) { queued = true; requestAnimationFrame(run); } };
+  stage.addEventListener("scroll", queue, true);
+  addEventListener("resize", queue);
+  stage.addEventListener("transitionend", queue);
+  const mo = new MutationObserver(queue);
+  mo.observe(stage, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "hidden", "open"] });
+  queue();
+  return {
+    refresh: queue,
+    stop: () => {
+      mo.disconnect();
+      stage.removeEventListener("scroll", queue, true);
+      removeEventListener("resize", queue);
+      stage.removeEventListener("transitionend", queue);
+      shifted.forEach((el) => { shiftRow(el, 0); });
+      shifted.clear();
+    },
+  };
+}
+
+// Moves a row right by dx and narrows it by the same amount, so its right
+// end stays where it was instead of running past the blade's edge.
+function shiftRow(el, dx) {
+  el.style.translate = dx ? `${dx}px 0` : "";
+  el.style.maxWidth = dx ? `calc(100% - ${dx}px)` : "";
+}
+
+function bladesPlace(instant) {
+  if (!bstage) return;
+  const W = innerWidth, narrow = W < 700, p = narrow ? 30 : 52, r = narrow ? 20 : 44, edge = narrow ? 14 : 30, n = PAGES.length;
+  const ms = instant || calm() ? 0 : 700;
+  bstage.style.cssText = `--p:${p}px;--r:${r}px;--edge:${edge}px;--bw:${W - edge - (n - 1) * p + r}px;--ms:${ms}ms`;
+  $$(".bsec", bstage).forEach((s, i) => {
+    s.style.transform = `translateX(${i <= bcur ? i * p : W - edge - (n - i) * p}px)`;
+    s.style.zIndex = 10 + i;
+    s.classList.toggle("open", i === bcur);
+    $(".btab", s).tabIndex = i === bcur ? -1 : 0;
+    $(".bwrap", s).inert = i !== bcur;
+  });
+  $$(".bnav", bstage).forEach((b) => { b.disabled = (+b.dataset.dir < 0 && bcur === 0) || (+b.dataset.dir > 0 && bcur === n - 1); });
+}
+
+/** Open the blade for `id`: #main moves into it and the blades slide. */
+function bladesShow(id, instant) {
+  bladesBuild();
+  const i = Math.max(0, PAGES.findIndex(([p]) => p === (HIDDEN_PAGES[id] || id)));
+  const slot = $$(".bbody", bstage)[i], main = $("#main");
+  if (main.parentNode !== slot) slot.append(main);
+  bcur = i;
+  const title = (PAGES.find(([p]) => p === id) || [id, "Log"])[1];
+  $(".bband h1", $$(".bsec", bstage)[i]).textContent = title;
+  bladesPlace(instant);
+  if (bcontour) bcontour.refresh();
+}
+
+function bladesOff() {
+  if (bcontour) bcontour.stop();
+  bcontour = null;
+  const main = $("#main"), layout = $(".layout");
+  if (main && layout && main.parentNode !== layout) layout.insertBefore(main, $(".side"));
+  if (bstage) { bstage.remove(); bstage = null; }
+}
+
+function bladesStep(d) {
+  const j = Math.max(0, Math.min(PAGES.length - 1, bcur + d));
+  if (j !== bcur) go(PAGES[j][0]);
+}
+
+/** Chip and status line on every blade's top band. */
+function drawBladesStatus(text, level) {
+  if (!isBlades() || !bstage) return;
+  const chip = level === "good" ? "All good" : level === "bad" ? "Problem" : "Needs a look";
+  $$(".bband", bstage).forEach((b) => {
+    $(".btxt", b).textContent = chip;
+    $(".bdot", b).className = "bdot " + (level === "good" ? "" : level);
+    $(".bspeed", b).textContent = text;
+    $(".bspeed", b).title = text;
+  });
+}
+
+/** Keys in Blades: arrows switch, Esc closes a dialog, then the log, then goes to the first blade. */
+function bladesKey(e) {
+  if (e.altKey || e.ctrlKey || e.metaKey) return;
+  const tag = (document.activeElement || {}).tagName || "";
+  if (/^(INPUT|TEXTAREA|SELECT)$/.test(tag)) return;
+  if ($("#picker").classList.contains("open")) { if (e.key === "Escape") { e.preventDefault(); $("#picker-cancel").click(); } return; }
+  if (e.key === "ArrowRight") { e.preventDefault(); bladesStep(1); }
+  else if (e.key === "ArrowLeft") { e.preventDefault(); bladesStep(-1); }
+  else if (e.key === "Escape") {
+    if (page === "log") { e.preventDefault(); go("config"); }
+    else if (bcur > 0) { e.preventDefault(); go(PAGES[0][0]); }
+  } else if (e.key === "Enter" && (!tag || tag === "BODY")) {
+    const first = $(".bsec.open .bbody button, .bsec.open .bbody input, .bsec.open .bbody select", bstage);
+    if (first) { e.preventDefault(); first.focus(); }
+  }
+}
+document.addEventListener("keydown", (e) => { if (isBlades()) bladesKey(e); });
+for (const type of ["mousedown", "mouseup"]) {
+  window.addEventListener(type, (e) => {
+    if (e.button !== 3 || !isBlades()) return;
+    e.preventDefault();
+    if (type !== "mouseup") return;
+    if ($("#picker").classList.contains("open")) { if (e.key === "Escape") { e.preventDefault(); $("#picker-cancel").click(); } return; }
+    if (page === "log") return go("config");
+    bladesStep(-1);
+  });
+}
+addEventListener("resize", () => { if (isBlades()) bladesPlace(true); });
+
 // ---------- Box of X look ----------
 
 let greenHome = true;     // on the orb's home screen
@@ -93,11 +299,20 @@ let greenCursor = 0;      // highlighted entry there
 const isGreen = () => document.body.classList.contains("green");
 
 function applyTheme(theme) {
-  const green = theme === "green";
-  if (green === isGreen() && document.body.dataset.themed) return;
-  document.body.dataset.themed = "1";
+  const green = theme === "green", blades = theme === "blades";
+  const key = blades ? "blades" : green ? "green" : "ff";
+  $$("#theme-pick [data-theme]").forEach((b) => b.classList.toggle("picked", b.dataset.theme === key));
+  if (document.body.dataset.themed === key) return;
+  document.body.dataset.themed = key;
   document.body.classList.toggle("green", green);
-  $$("#theme-pick [data-theme]").forEach((b) => b.classList.toggle("picked", b.dataset.theme === (green ? "green" : "ff")));
+  document.body.classList.toggle("blades", blades);
+  if (blades) {
+    greenHome = false;
+    document.body.classList.remove("g-at-home");
+    bladesShow(page, true);
+    return;
+  }
+  bladesOff();
   if (green) greenShowHome(false);
   else document.body.classList.remove("g-at-home");
 }
@@ -177,6 +392,7 @@ function renderGreenStatus() {
 function go(id) {
   if (!PAGES.some(([p]) => p === id) && !HIDDEN_PAGES[id]) id = "watch";
   page = id;
+  if (isBlades()) bladesShow(id);
   const menuId = HIDDEN_PAGES[id] || id;
   $$(".menu-item").forEach((b) => b.classList.toggle("selected", b.dataset.go === menuId));
   $$(".page").forEach((p) => p.classList.toggle("active", p.dataset.page === id));
@@ -361,6 +577,9 @@ function renderStatusBar() {
   }
   $("#statusbar").textContent = text;
   renderGreenStatus();
+  const level = sub.state === "error" || sub.state === "nopython" ? "bad"
+    : sub.state === "installing" || !s.watch_enabled || !s.folders.length ? "warn" : "good";
+  drawBladesStatus(text, level);
 }
 
 function renderJobs(jobs) {
@@ -559,6 +778,7 @@ function wireActions() {
     applyTheme(config.theme);
     // Stay on Settings in the new look.
     if (isGreen()) { greenHome = false; document.body.classList.remove("g-at-home"); go("config"); }
+    else if (isBlades()) go("config");
     queueSave({ theme: config.theme });
   };
   $("#log-back").onclick = () => go("config");
