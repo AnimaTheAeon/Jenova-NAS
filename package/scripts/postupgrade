@@ -2,4 +2,6 @@
 # A freshly installed package is the newest version: drop any update Jenova
 # downloaded earlier so it can't shadow it.
 rm -rf "$SYNOPKG_PKGVAR/app-update"
+# Let the service replace the window's files when it updates itself (ignored if DSM doesn't allow it).
+chown -R "$SYNOPKG_PKGNAME:$SYNOPKG_PKGNAME" "$SYNOPKG_PKGDEST/ui" 2>/dev/null || true
 exit 0

@@ -554,6 +554,7 @@ function renderUpdate(u) {
   } else lastEl.innerHTML = "";
   // Show the setup steps until the scheduled task has run once.
   $("#update-setup").style.display = config && config.auto_update && !(last && last.time) ? "" : "none";
+  $("#update-window").style.display = u.can_install_now && !u.window_updates ? "" : "none";
   const cmd = $("#update-command");
   if (cmd.value !== u.command) cmd.value = u.command || "";
 }

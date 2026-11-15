@@ -1,5 +1,7 @@
 #!/bin/sh
 mkdir -p "$SYNOPKG_PKGVAR"
+# Let the service replace the window's files when it updates itself (ignored if DSM doesn't allow it).
+chown -R "$SYNOPKG_PKGNAME:$SYNOPKG_PKGNAME" "$SYNOPKG_PKGDEST/ui" 2>/dev/null || true
 {
 cat << 'NOTE'
 <p style="font-weight:bold;">One more step: let Jenova into your media folders</p>

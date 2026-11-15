@@ -217,6 +217,7 @@ pub fn status_json() -> Value {
         "last_install": last_install(),
         "command": command_line(),
         "can_install_now": can_install_now(),
+        "window_updates": std::env::var("JENOVA_WINDOW_UPDATES").is_ok(),
         "progress": progress().lock().unwrap_or_else(|e| e.into_inner()).clone(),
     })
 }
