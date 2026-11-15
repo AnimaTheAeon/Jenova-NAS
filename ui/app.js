@@ -299,7 +299,11 @@ function ago(secs) {
   return Math.round(secs / 86400) + " days ago";
 }
 
+let seenVersion = "";
 function renderUpdate(u) {
+  // The service came back on a new version after Update now: reload the page.
+  if (seenVersion && u.current && u.current !== seenVersion) { location.reload(); return; }
+  if (u.current) seenVersion = u.current;
   const st = $("#update-state");
   const checked = u.checked_at ? ` <span class="dim small">· checked ${ago(u.now - u.checked_at)}</span>` : "";
   if (u.checking) st.innerHTML = `Installed ${esc(u.current)} · <span class="warn">Checking GitHub…</span>`;
@@ -308,6 +312,21 @@ function renderUpdate(u) {
   else if (u.latest) st.innerHTML = `Installed ${esc(u.current)} · <span class="good">Up to date</span>${checked}`;
   else st.innerHTML = `Installed ${esc(u.current)}`;
   $("#update-check").disabled = !!u.checking;
+  const pr = u.progress;
+  const busy = !!(pr && pr.phase !== "failed");
+  $("#update-now").style.display = u.available && u.can_install_now && !busy ? "" : "none";
+  const prow = $("#update-progress");
+  prow.style.display = pr ? "" : "none";
+  if (pr) {
+    const mb = (n) => (n / 1048576).toFixed(1);
+    let frac = 0, text = "";
+    if (pr.phase === "download") { frac = pr.total ? 0.02 + 0.8 * Math.min(1, pr.done / pr.total) : 0.1; text = `Downloading ${esc(pr.to)}: ${mb(pr.done)}${pr.total ? " of " + mb(pr.total) : ""} MB`; }
+    else if (pr.phase === "verify") { frac = 0.88; text = "Checking the download…"; }
+    else if (pr.phase === "restart") { frac = 0.96; text = `Restarting on ${esc(pr.to)}. This page reloads by itself.`; }
+    else { text = `<span class="bad">Update failed: ${esc(pr.message)}</span>`; }
+    $("#update-bar").style.width = (frac * 100).toFixed(1) + "%";
+    $("#update-step").innerHTML = text;
+  }
 
   const last = u.last_install;
   const lastEl = $("#update-last");
@@ -544,6 +563,7 @@ function wireActions() {
   };
   $("#log-back").onclick = () => go("config");
   $("#clear-jobs").onclick = async () => { await api("jobs/clear", {}); refresh(); };
+  $("#update-now").onclick = async () => { try { await api("update/install", {}); } catch (e) { alert(e.message || e); } refreshStatus(); setTimeout(refreshStatus, 1000); };
   $("#update-check").onclick = async () => { await api("update/check", {}); refreshStatus(); setTimeout(refreshStatus, 3000); };
   $("#update-command").onclick = (e) => e.target.select();
   $("#reinstall").onclick = async () => { await api("subliminal/reinstall", {}); refreshStatus(); };

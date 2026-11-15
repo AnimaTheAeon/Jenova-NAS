@@ -1,2 +1,5 @@
 #!/bin/sh
+# A freshly installed package is the newest version: drop any update Jenova
+# downloaded earlier so it can't shadow it.
+rm -rf "$SYNOPKG_PKGVAR/app-update"
 exit 0

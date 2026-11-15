@@ -65,7 +65,9 @@ GitHub Actions builds and tests every push. Bumping `version` in `Cargo.toml` an
 
 ## Automatic updates
 
-Jenova checks GitHub twice a day and shows what's available on its **Config** page. DSM only lets packages install updates through a root scheduled task, so set this up once:
+Jenova checks GitHub twice a day and shows what's available on its **Config** page. When a new version is out, **Update now** downloads it, checks it against GitHub's SHA-256 and restarts Jenova on it, with no setup. If the new version won't start, Jenova goes back to the one that was installed.
+
+To also have DSM install updates when you haven't opened Jenova for a while (and refresh the window itself), add an optional root task:
 
 **Control Panel → Task Scheduler → Create → Scheduled Task → User-defined script**
 - General: User **root**

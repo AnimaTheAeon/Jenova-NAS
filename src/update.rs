@@ -3,10 +3,17 @@
 //! The service (running as the Jenova user) checks GitHub twice a day so the
 //! window can show what's available. Installing needs root, which DSM only
 //! gives packages through a Task Scheduler task running `jenova-nas update`.
+//!
+//! "Update now" in the window needs no task: the service downloads the new
+//! package itself, unpacks the program into `<JENOVA_UPDATE_DIR>/next` and exits
+//! with RESTART_CODE; jenova-run.sh swaps it in and starts it again. The
+//! scheduled task stays for hands-off updates and also refreshes the window's
+//! own files, which only a real package install can replace.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -28,6 +35,7 @@ pub struct Release {
     pub spk_url: String,
     pub spk_name: String,
     pub sha256: Option<String>,
+    pub size: u64,
 }
 
 /// What the background check last saw.
@@ -121,6 +129,7 @@ pub fn parse_release(json: &Value) -> Result<Release, String> {
             .as_str()
             .and_then(|d| d.strip_prefix("sha256:"))
             .map(|d| d.to_ascii_lowercase()),
+        size: asset["size"].as_u64().unwrap_or(0),
     })
 }
 
@@ -207,6 +216,8 @@ pub fn status_json() -> Value {
         "now": now(),
         "last_install": last_install(),
         "command": command_line(),
+        "can_install_now": can_install_now(),
+        "progress": progress().lock().unwrap_or_else(|e| e.into_inner()).clone(),
     })
 }
 
@@ -214,6 +225,157 @@ pub fn command_line() -> String {
     std::env::var("SYNOPKG_PKGDEST")
         .map(|d| format!("{d}/bin/jenova-nas update"))
         .unwrap_or_else(|_| format!("/var/packages/{PACKAGE}/target/bin/jenova-nas update"))
+}
+
+// ---------- installing from the window (no root) ----------
+
+/// Exit code that tells jenova-run.sh "start me again".
+pub const RESTART_CODE: i32 = 75;
+
+static INSTALLING: AtomicBool = AtomicBool::new(false);
+
+/// What "Update now" is doing, for the window.
+#[derive(Serialize, Clone, Default)]
+pub struct Progress {
+    pub to: String,
+    /// "download", "verify", "restart" or "failed".
+    pub phase: String,
+    pub done: u64,
+    pub total: u64,
+    pub message: String,
+}
+
+fn progress() -> &'static Mutex<Option<Progress>> {
+    static P: OnceLock<Mutex<Option<Progress>>> = OnceLock::new();
+    P.get_or_init(Default::default)
+}
+
+fn set_progress(to: &str, phase: &str, done: u64, total: u64, message: &str) {
+    *progress().lock().unwrap_or_else(|e| e.into_inner()) =
+        Some(Progress { to: to.into(), phase: phase.into(), done, total, message: message.into() });
+}
+
+fn update_dir() -> Option<PathBuf> {
+    std::env::var("JENOVA_UPDATE_DIR").ok().filter(|d| !d.trim().is_empty()).map(PathBuf::from)
+}
+
+/// True when the service can install updates by itself (jenova-run.sh runs it).
+pub fn can_install_now() -> bool {
+    update_dir().is_some()
+}
+
+/// "Update now": download, check and unpack in the background, then restart.
+pub fn start_install() -> Result<(), String> {
+    let dir = update_dir().ok_or("Jenova wasn't started by its package script, so it can't update itself. Install the .spk from GitHub.")?;
+    let release = state()
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .latest
+        .clone()
+        .filter(|r| is_newer(&r.version, current_version()))
+        .ok_or("There's no newer version to install")?;
+    if INSTALLING.swap(true, Ordering::SeqCst) {
+        return Err("An update is already running".into());
+    }
+    set_progress(&release.version, "download", 0, release.size, "");
+    std::thread::Builder::new()
+        .name("update-install".into())
+        .spawn(move || {
+            let from = current_version().to_string();
+            info!("Updating Jenova {from} -> {}", release.version);
+            match install_into(&release, &dir) {
+                Ok(()) => {
+                    record(true, &from, &release.version, &format!("Updated to {}", release.version));
+                    set_progress(&release.version, "restart", 1, 1, "");
+                    // Give the window a moment to see "restart", then stop the
+                    // Subliminal downloads and exit; jenova-run.sh does the swap.
+                    std::thread::sleep(Duration::from_secs(2));
+                    let _ = Command::new("pkill").args(["-TERM", "-P", &std::process::id().to_string()]).status();
+                    let _ = std::fs::remove_file(var_dir().join("jenova.pid"));
+                    std::process::exit(RESTART_CODE);
+                }
+                Err(e) => {
+                    warn!("Update failed: {e}");
+                    record(false, &from, &release.version, &e);
+                    set_progress(&release.version, "failed", 0, 0, &e);
+                    INSTALLING.store(false, Ordering::SeqCst);
+                }
+            }
+        })
+        .map(|_| ())
+        .map_err(|e| e.to_string())
+}
+
+fn tar(args: &[&str]) -> Result<(), String> {
+    let out = Command::new("tar").args(args).output().map_err(|e| format!("Couldn't run tar: {e}"))?;
+    if out.status.success() {
+        Ok(())
+    } else {
+        Err(format!("Couldn't unpack the download: {}", String::from_utf8_lossy(&out.stderr).trim()))
+    }
+}
+
+/// Download the package, check it and leave the new program in `<dir>/next`.
+fn install_into(release: &Release, dir: &Path) -> Result<(), String> {
+    let work = dir.join("work");
+    let _ = std::fs::remove_dir_all(&work);
+    std::fs::create_dir_all(&work).map_err(|e| e.to_string())?;
+    let result = (|| {
+        let spk = work.join("download.spk");
+        let spk_str = spk.to_string_lossy().to_string();
+        let mut child = Command::new("curl")
+            .args(["-fsSL", "--retry", "2", "--connect-timeout", "20", "--max-time", "900", "-A", "Jenova-NAS", "-o", &spk_str, &release.spk_url])
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .map_err(|e| format!("Download failed: couldn't run curl: {e}"))?;
+        let status = loop {
+            if let Some(st) = child.try_wait().map_err(|e| e.to_string())? {
+                break st;
+            }
+            let done = std::fs::metadata(&spk).map(|m| m.len()).unwrap_or(0);
+            set_progress(&release.version, "download", done, release.size, "");
+            std::thread::sleep(Duration::from_millis(400));
+        };
+        if !status.success() {
+            let mut err = String::new();
+            if let Some(mut e) = child.stderr.take() {
+                use std::io::Read;
+                let _ = e.read_to_string(&mut err);
+            }
+            return Err(format!("Download failed: {}", if err.trim().is_empty() { "couldn't reach GitHub" } else { err.trim() }));
+        }
+        let size = std::fs::metadata(&spk).map(|m| m.len()).unwrap_or(0);
+        set_progress(&release.version, "verify", size, size, "");
+        if let Some(expected) = &release.sha256 {
+            if &sha256_file(&spk)? != expected {
+                return Err("The download didn't match GitHub's checksum. Nothing was changed.".to_string());
+            }
+        }
+        let outer = work.join("outer");
+        std::fs::create_dir_all(&outer).map_err(|e| e.to_string())?;
+        tar(&["-xf", &spk_str, "-C", &outer.to_string_lossy()])?;
+        let staged = work.join("staged");
+        std::fs::create_dir_all(&staged).map_err(|e| e.to_string())?;
+        tar(&["-xzf", &outer.join("package.tgz").to_string_lossy(), "-C", &staged.to_string_lossy()])?;
+        let exe = staged.join("bin").join("jenova-nas");
+        if !exe.is_file() {
+            return Err("The download has no Jenova program in it. Nothing was changed.".into());
+        }
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let _ = std::fs::set_permissions(&exe, std::fs::Permissions::from_mode(0o755));
+        }
+        let said = Command::new(&exe).arg("version").output().map_err(|e| format!("The new program won't start: {e}"))?;
+        if String::from_utf8_lossy(&said.stdout).trim() != release.version {
+            return Err("The downloaded program isn't the version GitHub listed. Nothing was changed.".into());
+        }
+        let next = dir.join("next");
+        let _ = std::fs::remove_dir_all(&next);
+        std::fs::rename(&staged, &next).map_err(|e| format!("Couldn't put the update in place: {e}"))?;
+        Ok(())
+    })();
+    let _ = std::fs::remove_dir_all(&work);
+    result
 }
 
 // ---------- installing (root, from Task Scheduler) ----------

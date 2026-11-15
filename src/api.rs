@@ -204,6 +204,9 @@ fn handle(mut req: Request, shared: &Arc<Shared>, cache: &AuthCache) {
             Ok(json!({ "ok": true }))
         }
         (false, "update") => Ok(crate::update::status_json()),
+        (true, "update/install") => {
+            crate::update::start_install().map(|()| crate::update::status_json())
+        }
         (true, "update/check") => {
             crate::update::request_check();
             Ok(crate::update::status_json())

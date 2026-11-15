@@ -1,7 +1,6 @@
 #!/bin/sh
 # DSM service control for Jenova.
 PID_FILE="$SYNOPKG_PKGVAR/jenova.pid"
-BIN="$SYNOPKG_PKGDEST/bin/jenova-nas"
 
 is_running() {
 	[ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null
@@ -11,7 +10,8 @@ case "$1" in
 	start)
 		is_running && exit 0
 		export SYNOPKG_PKGVAR
-		nohup "$BIN" daemon >> "$SYNOPKG_PKGVAR/service.out" 2>&1 < /dev/null &
+		# jenova-run.sh keeps Jenova running and applies updates it downloads.
+		nohup /bin/sh "$(dirname "$0")/jenova-run.sh" "$SYNOPKG_PKGVAR" "$SYNOPKG_PKGDEST" >> "$SYNOPKG_PKGVAR/service.out" 2>&1 < /dev/null &
 		# Give it a moment so DSM sees it running.
 		i=0
 		while [ $i -lt 20 ]; do
