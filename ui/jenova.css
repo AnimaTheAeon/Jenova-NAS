@@ -483,3 +483,9 @@ body.blades .modal button:hover:not(:disabled) { background: linear-gradient(180
 body.blades .modal button.big { background: linear-gradient(180deg, rgba(255, 255, 255, .42), rgba(255, 255, 255, .16)); border-color: rgba(255, 255, 255, .85); }
 body.blades .modal .picker-item:hover { background: rgba(255, 255, 255, .14); }
 body.blades .modal { --text: #ffffff; --dim: rgba(255, 255, 255, .8); --label: #eef2ff; text-shadow: none; }
+
+/* Table headings: a solid bar so they read as the top of the table. */
+th { font-size: 13.5px; letter-spacing: .6px; text-transform: uppercase; padding: 7px 10px; border-bottom: 2px solid var(--border-light); }
+body.blades .bbody th { background: var(--band); color: #ffffff; font-size: 14px; padding: 9px 10px; border-bottom: 2px solid rgba(255, 255, 255, .6); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .25), 0 3px 8px rgba(0, 0, 0, .25); }
+body.blades .bbody th:first-child { border-radius: 14px 0 0 0; }
+body.blades .bbody th:last-child { border-radius: 0 14px 0 0; }
