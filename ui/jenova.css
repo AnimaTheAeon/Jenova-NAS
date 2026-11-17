@@ -489,3 +489,260 @@ th { font-size: 13.5px; letter-spacing: .6px; text-transform: uppercase; padding
 body.blades .bbody th { background: var(--band); color: #ffffff; font-size: 14px; padding: 9px 10px; border-bottom: 2px solid rgba(255, 255, 255, .6); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .25), 0 3px 8px rgba(0, 0, 0, .25); }
 body.blades .bbody th:first-child { border-radius: 14px 0 0 0; }
 body.blades .bbody th:last-child { border-radius: 0 14px 0 0; }
+
+/* =====================================================================
+   Liquid Glass (dark): frosted panes over a dark, softly lit backdrop,
+   capsule controls, iOS switches and springy motion. Everything hangs off
+   body.glass. Spring: cubic-bezier(.32,.72,0,1).
+   ===================================================================== */
+html:has(body.glass) { background: #04050a; }
+body.glass {
+  --text: #ffffff; --dim: rgba(235, 235, 245, .62); --label: rgba(235, 235, 245, .62); --head: #ffffff;
+  --good: #30d158; --warn: #ff9f0a; --bad: #ff453a; --info: #64b5ff;
+  --border-light: rgba(255, 255, 255, .22); --border-mid: rgba(255, 255, 255, .12); --border-dark: rgba(0, 0, 0, .45);
+  --field: rgba(118, 118, 128, .24); --btn: rgba(255, 255, 255, .1); --btn-hover: rgba(255, 255, 255, .17);
+  --line: rgba(84, 84, 88, .5); --accent: #0a84ff; --spring: cubic-bezier(.32, .72, 0, 1);
+  --glass: rgba(255, 255, 255, .06);
+  --glass-edge: inset 0 1px 0 rgba(255, 255, 255, .22), inset 0 -1px 0 rgba(0, 0, 0, .28), 0 0 0 1px rgba(0, 0, 0, .45), 0 0 0 2px rgba(255, 255, 255, .05);
+    background: radial-gradient(900px 640px at 10% 6%, rgba(56, 92, 255, .38), transparent 60%), radial-gradient(820px 620px at 94% 24%, rgba(168, 64, 255, .26), transparent 62%), radial-gradient(900px 700px at 58% 112%, rgba(0, 190, 170, .2), transparent 60%), #04050a;
+  background-attachment: fixed;
+  font: 500 14px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", Inter, system-ui, sans-serif;
+  text-shadow: none; color: var(--text);
+}
+body.glass a { color: var(--info); }
+body.glass button, body.glass .btn, body.glass input, body.glass select, body.glass textarea, body.glass .menu-item, body.glass .sub-item { font-family: inherit; text-shadow: none; }
+
+/* Layout: sidebar on the left, like an iPad app. */
+body.glass .layout { grid-template-columns: 236px minmax(0, 1fr); gap: 14px; padding: 16px; }
+body.glass .side { grid-column: 1; grid-row: 1; }
+body.glass #main { grid-column: 2; grid-row: 1; }
+body.glass #statusbar { grid-column: 1 / span 2; border-radius: 23px; padding: 0 20px; font-size: 14px; font-weight: 600; color: var(--dim); }
+body.glass .win {
+  background: var(--glass); border: 0; border-radius: 26px;
+  -webkit-backdrop-filter: blur(30px) saturate(170%); backdrop-filter: blur(30px) saturate(170%);
+  box-shadow: var(--glass-edge), 0 18px 48px rgba(0, 0, 0, .45);
+}
+body.glass #main { padding: 18px 20px; }
+body.glass .page { animation: lgIn .5s var(--spring) both; }
+@keyframes lgIn { from { opacity: 0; transform: translateY(10px) scale(.99); } to { opacity: 1; transform: none; } }
+body.glass .page-head h1 { font-size: 30px; font-weight: 800; letter-spacing: -.6px; }
+body.glass .head { color: var(--text); font-weight: 700; }
+body.glass .label, body.glass .info-row .label { color: var(--dim); font-weight: 600; }
+body.glass .divider { border-color: var(--line); background: var(--line); }
+
+/* Sidebar menu: a selection pill that glides between items. */
+body.glass #menu { position: relative; padding: 10px; display: flex; flex-direction: column; gap: 4px; }
+body.glass #menu::before { content: ""; position: absolute; left: var(--sel-left, 10px); width: var(--sel-w, calc(100% - 20px)); top: var(--sel-top, 10px); height: var(--sel-h, 42px); border-radius: 21px; background: rgba(255, 255, 255, .16); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .28), 0 0 0 1px rgba(0, 0, 0, .35), 0 6px 18px rgba(0, 0, 0, .3); transition: top .55s var(--spring), left .55s var(--spring), width .55s var(--spring), height .55s var(--spring); pointer-events: none; }
+body.glass #menu:not(.has-sel)::before { opacity: 0; }
+body.glass .menu-item, body.glass .sub-item { position: relative; z-index: 1; min-height: 42px; padding: 0 16px; border-radius: 21px; background: none; color: rgba(235, 235, 245, .86); font-size: 16px; font-weight: 600; transition: transform .35s var(--spring), background-color .3s ease, color .3s ease; }
+body.glass .menu-item:hover:not(:disabled), body.glass .sub-item:hover:not(:disabled) { background: rgba(255, 255, 255, .06); color: #fff; }
+body.glass .menu-item:active:not(:disabled), body.glass .sub-item:active:not(:disabled) { background: rgba(255, 255, 255, .1); }
+body.glass .menu-item:active, body.glass .sub-item:active { transform: scale(.97); }
+body.glass .menu-item.selected, body.glass .sub-item.selected { color: #fff; }
+body.glass .menu-item:focus-visible, body.glass .sub-item:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--accent); }
+body.glass .hand { display: none !important; }
+body.glass .subnav { padding-right: 4px; }
+body.glass .sub-item { min-height: 36px; font-size: 15px; margin: 1px 0; }
+body.glass .sub-item.selected { background: rgba(255, 255, 255, .14); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .2), 0 0 0 1px rgba(0, 0, 0, .3); }
+body.glass #info { padding: 16px 18px; }
+body.glass .info-row { font-size: 16px; font-weight: 700; }
+body.glass .info-row + .info-row { margin-top: 6px; }
+body.glass button.mode { margin-top: 12px; color: var(--text); }
+
+/* Buttons: glass capsules that give a little when pressed. */
+body.glass button, body.glass .btn { min-height: 34px; padding: 0 16px; border: 0; border-radius: 17px; background: var(--btn); color: var(--text); font-size: 14px; font-weight: 600; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .22), 0 0 0 1px rgba(0, 0, 0, .4); transition: transform .35s var(--spring), background-color .3s ease, box-shadow .3s ease, opacity .3s ease; }
+body.glass button:hover:not(:disabled), body.glass .btn:hover { background: var(--btn-hover); border-color: transparent; }
+body.glass button:active:not(:disabled) { background: rgba(255, 255, 255, .22); transform: scale(.96); }
+body.glass button:focus-visible { outline: none; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .22), 0 0 0 2px var(--accent); }
+body.glass button.small { min-height: 26px; padding: 0 12px; font-size: 12.5px; border-radius: 13px; }
+body.glass button.big { min-height: 42px; padding: 0 22px; font-size: 16px; border-radius: 21px; }
+body.glass button.primary { background: var(--accent); color: #fff; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35), 0 0 0 1px rgba(0, 0, 0, .35), 0 6px 18px rgba(10, 132, 255, .3); }
+body.glass button.primary:hover:not(:disabled) { background: #2a95ff; }
+body.glass button.danger { color: #ff6961; background: rgba(255, 69, 58, .16); }
+body.glass button.danger:hover:not(:disabled) { background: rgba(255, 69, 58, .26); }
+body.glass button.pill { border-radius: 17px; }
+body.glass button.pill.on { background: rgba(255, 255, 255, .24); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35), 0 0 0 1px rgba(0, 0, 0, .3), 0 4px 12px rgba(0, 0, 0, .35); }
+body.glass button.link, body.glass button.x, body.glass .menu-item, body.glass .sub-item { box-shadow: none; }
+body.glass button.link { min-height: 0; padding: 0; background: none; color: var(--info); }
+body.glass button.x { min-height: 0; padding: 0 4px; background: none; color: var(--bad); }
+/* ON/OFF buttons become iOS switches (the button keeps its click and its text for screen readers). */
+body.glass button.toggle { position: relative; width: 51px; min-width: 51px; height: 31px; min-height: 31px; padding: 0; border-radius: 16px; font-size: 0; color: transparent; background: rgba(120, 120, 128, .36); box-shadow: none; transition: background-color .35s ease; }
+body.glass button.toggle::before { content: ""; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%; background: #fff; box-shadow: 0 3px 8px rgba(0, 0, 0, .3); transition: transform .45s var(--spring); }
+body.glass button.toggle.on { background: var(--good); }
+body.glass button.toggle.on::before { transform: translateX(20px); }
+body.glass button.toggle:hover:not(:disabled) { background: rgba(120, 120, 128, .5); }
+body.glass button.toggle.on:hover:not(:disabled) { background: #3ddc65; }
+body.glass button.toggle:active:not(:disabled) { transform: none; }
+body.glass button.toggle:active:not(:disabled)::before { width: 31px; }
+body.glass button.toggle.on:active:not(:disabled)::before { transform: translateX(16px); }
+
+/* Fields: tinted capsules. */
+body.glass input[type="text"], body.glass input[type="password"], body.glass input[type="number"], body.glass input[type="search"], body.glass input[type="date"], body.glass select, body.glass textarea { min-height: 34px; padding: 0 14px; border: 0; border-radius: 17px; background: var(--field); color: var(--text); font-size: 14px; font-weight: 500; transition: box-shadow .3s ease; }
+body.glass textarea { padding: 8px 14px; border-radius: 14px; font: 400 12.5px/1.4 ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+body.glass select { padding-right: 32px; -webkit-appearance: none; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23ebebf5' stroke-opacity='.6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 13px center; }
+body.glass select option { background: #1c1c24; color: #fff; }
+body.glass input:focus, body.glass select:focus, body.glass textarea:focus { box-shadow: inset 0 0 0 2px var(--accent); }
+body.glass input::placeholder, body.glass textarea::placeholder { color: rgba(235, 235, 245, .4); }
+/* Check boxes become iOS switches too. */
+body.glass label.check .box { width: 51px; height: 31px; border: 0; border-radius: 16px; background: rgba(120, 120, 128, .36); transition: background-color .35s ease; }
+body.glass label.check .box::before { content: ""; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%; background: #fff; box-shadow: 0 3px 8px rgba(0, 0, 0, .3); transition: transform .45s var(--spring); }
+body.glass label.check input:checked + .box { background: var(--good); border: 0; }
+body.glass label.check input:checked + .box::before { transform: translateX(20px); }
+body.glass label.check input:checked + .box::after { display: none; }
+body.glass label.check input:focus-visible + .box { box-shadow: 0 0 0 2px var(--accent); }
+
+/* Settings rows: grouped, with hairlines like an iOS list. */
+body.glass .field { padding: 10px 0; border-bottom: 1px solid var(--line); gap: 16px; }
+body.glass .field .lbl .name { font-weight: 600; }
+body.glass .field .lbl .help { font-weight: 400; color: var(--dim); }
+body.glass .example { color: var(--good); }
+body.glass .field .ctl { min-width: 0; max-width: 66%; }
+body.glass .field .ctl input[type="text"], body.glass .field .ctl input[type="password"], body.glass .field .ctl select { flex: 0 1 300px; width: 300px; min-width: 110px; }
+body.glass .field .ctl > button, body.glass .field .ctl .row > button { flex: none; }
+body.glass .field .ctl > .row { min-width: 0; flex: 1 1 auto; }
+body.glass .field .ctl .row > input[type="text"], body.glass .field .ctl .row > input[type="password"] { flex: 1 1 230px; width: 230px; min-width: 90px; }
+
+/* Cards, notices, tags. */
+body.glass .card { border: 0; border-radius: 18px; padding: 12px 14px; background: rgba(255, 255, 255, .06); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14), 0 0 0 1px rgba(0, 0, 0, .35); transition: transform .35s var(--spring), background-color .3s ease; }
+body.glass .card:hover { background: rgba(255, 255, 255, .11); border-color: transparent; }
+body.glass .card:active { transform: scale(.98); }
+body.glass .card.add { color: var(--info); }
+body.glass .notice { border: 0; border-radius: 16px; padding: 10px 14px; background: rgba(255, 159, 10, .12); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .1); }
+body.glass .notice.bad { background: rgba(255, 69, 58, .14); }
+body.glass .notice.good { background: rgba(48, 209, 88, .12); }
+body.glass .tag, body.glass .chip { border: 0; border-radius: 10px; padding: 1px 9px; font-weight: 600; background: rgba(118, 118, 128, .28); }
+body.glass .tag.good { background: rgba(48, 209, 88, .18); color: #4ee07a; } body.glass .tag.bad { background: rgba(255, 69, 58, .18); color: #ff6961; }
+body.glass .tag.warn { background: rgba(255, 159, 10, .18); color: #ffb340; } body.glass .tag.info { background: rgba(10, 132, 255, .2); color: #64b5ff; }
+body.glass .tag[class*="s-"] { background: rgba(118, 118, 128, .22); }
+body.glass .chip button { min-height: 0; padding: 0 3px; background: none; box-shadow: none; }
+body.glass .spec, body.glass .hit { border: 0; border-radius: 16px; background: rgba(255, 255, 255, .05); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .1), 0 0 0 1px rgba(0, 0, 0, .3); }
+body.glass .key i { border-radius: 50%; }
+body.glass .badge { box-shadow: none; }
+body.glass .badge.good { background: var(--good); } body.glass .badge.warn { background: var(--warn); } body.glass .badge.bad { background: var(--bad); }
+
+/* Posters: rounded art that lifts a little on hover. */
+body.glass .poster .art, body.glass .party .thumb, body.glass .hit .thumb, body.glass .hero .poster-big { border: 0; border-radius: 14px; background: linear-gradient(160deg, #2c2c3a, #121218); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14), 0 0 0 1px rgba(0, 0, 0, .45), 0 10px 24px rgba(0, 0, 0, .4); }
+body.glass .party .thumb, body.glass .hit .thumb { border-radius: 10px; }
+body.glass .poster .art { transition: transform .45s var(--spring), box-shadow .45s var(--spring); }
+body.glass .poster:hover .art { transform: translateY(-3px) scale(1.02); border-color: transparent; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .2), 0 0 0 1px rgba(0, 0, 0, .45), 0 16px 32px rgba(0, 0, 0, .5); }
+body.glass .poster:active .art { transform: scale(.98); }
+body.glass .poster.selected .art { box-shadow: 0 0 0 3px var(--accent), 0 10px 24px rgba(0, 0, 0, .4); }
+body.glass .poster .art .ph { font-size: 16px; font-weight: 700; text-transform: none; letter-spacing: -.2px; }
+body.glass .poster .bar { left: 10px; right: 10px; bottom: 8px; height: 4px; border-radius: 2px; }
+body.glass .poster .name { font-size: 13px; font-weight: 600; margin-top: 8px; }
+body.glass .party { border-bottom-color: var(--line); border-radius: 14px; padding: 8px 10px; transition: background-color .3s ease; }
+body.glass .party .name { font-size: 17px; font-weight: 700; }
+body.glass .hp { height: 6px; border: 0; border-radius: 3px; background: rgba(118, 118, 128, .3); }
+body.glass .hp > i, body.glass .hp.full > i { border-radius: 3px; background: var(--accent); box-shadow: none; }
+body.glass .hp.full > i { background: var(--good); }
+body.glass .person .face { border: 0; background-color: #2c2c3a; box-shadow: 0 0 0 1px rgba(0, 0, 0, .45), inset 0 1px 0 rgba(255, 255, 255, .14); }
+body.glass .hero .backdrop { border-radius: 20px; }
+body.glass .hero h1 { font-size: 30px; letter-spacing: -.5px; }
+body.glass .kv .k { color: var(--dim); }
+
+/* Tables. */
+body.glass th { background: rgba(28, 28, 34, .92); color: var(--dim); font-weight: 600; -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); }
+body.glass td { border-top-color: var(--line); }
+body.glass tr.click:hover td { background: rgba(255, 255, 255, .05); }
+
+/* Calendar. */
+body.glass .cal { gap: 6px; }
+body.glass .cal .dow { color: var(--dim); font-weight: 600; }
+body.glass .cal .day { border: 0; border-radius: 12px; background: rgba(255, 255, 255, .04); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06); }
+body.glass .cal .day.today { box-shadow: 0 0 0 2px var(--accent); }
+body.glass .cal .day.today .n { color: #fff; font-weight: 700; }
+body.glass .cal .ev { border-left: 0; border-radius: 7px; padding: 1px 7px; background: rgba(10, 132, 255, .24); }
+body.glass .cal .ev.cinema { background: rgba(255, 159, 10, .24); } body.glass .cal .ev.physical { background: rgba(191, 90, 242, .24); }
+body.glass .cal .ev.has { background: rgba(48, 209, 88, .26); }
+
+/* Drop-down menus. */
+body.glass .menu { padding: 6px; border: 0; border-radius: 16px; background: rgba(36, 36, 44, .96); -webkit-backdrop-filter: blur(30px); backdrop-filter: blur(30px); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14), 0 0 0 1px rgba(0, 0, 0, .5), 0 16px 40px rgba(0, 0, 0, .5); animation: lgPop .35s var(--spring); transform-origin: top left; }
+body.glass .menu button { min-height: 32px; border-radius: 10px; background: none; box-shadow: none; text-align: left; }
+body.glass .menu button:hover:not(:disabled) { background: rgba(255, 255, 255, .1); }
+@keyframes lgPop { from { opacity: 0; transform: scale(.94); } to { opacity: 1; transform: none; } }
+
+/* Dialogs: a solid sheet (nothing behind shows through its text), springing in. */
+body.glass .modal, body.glass .overlay-msg { background: rgba(0, 0, 0, .45); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+body.glass .modal > .win, body.glass .overlay-msg > .win { background: rgba(30, 30, 36, .97); border-radius: 26px; padding: 22px 24px; animation: lgSheet .5s var(--spring); }
+@keyframes lgSheet { from { opacity: 0; transform: translateY(24px) scale(.97); } to { opacity: 1; transform: none; } }
+body.glass .modal h2 { font-size: 22px; font-weight: 700; letter-spacing: -.3px; }
+body.glass .picker-item { border-radius: 12px; padding: 7px 12px; }
+body.glass .picker-item:hover { background: rgba(255, 255, 255, .08); }
+
+/* Toasts: small glass capsules. */
+body.glass #toasts { left: 50%; right: auto; bottom: 84px; transform: translateX(-50%); align-items: center; }
+body.glass .toast { border-radius: 22px; padding: 10px 18px; background: rgba(44, 44, 52, .92); font-weight: 600; animation: lgToast .5s var(--spring); }
+body.glass .toast.bad { color: #ff8a80; }
+@keyframes lgToast { from { opacity: 0; transform: translateY(14px) scale(.96); } to { opacity: 1; transform: none; } }
+
+/* Scrollbars, spinner, log. */
+body.glass .scroll::-webkit-scrollbar-thumb, body.glass .modal .body::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, .22); border-radius: 4px; border: 0; }
+body.glass .spin { border-color: rgba(255, 255, 255, .2); border-top-color: #fff; }
+body.glass .log-line .t { color: var(--dim); }
+
+/* Update progress. */
+body.glass .upd { background: rgba(0, 0, 0, .45); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+body.glass .upd .updcard { background: rgba(30, 30, 36, .97); transform: translateY(18px) scale(.97); transition: transform .55s var(--spring); }
+body.glass .upd.on .updcard { transform: none; }
+body.glass .updtitle { font-size: 20px; font-weight: 700; }
+body.glass .updbar { height: 8px; border: 0; border-radius: 4px; background: rgba(118, 118, 128, .3); }
+body.glass .updbar i { border-radius: 4px; background: var(--accent); }
+body.glass .updbar i::after { display: none; }
+
+/* Reduce motion. */
+body.glass.calm .page, body.glass.calm .menu, body.glass.calm .modal > .win, body.glass.calm .toast { animation: none; }
+body.glass.calm #menu::before, body.glass.calm button, body.glass.calm button::before, body.glass.calm .box::before, body.glass.calm .poster .art, body.glass.calm .upd .updcard { transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  body.glass .page, body.glass .menu, body.glass .modal > .win, body.glass .toast { animation: none; }
+  body.glass #menu::before, body.glass .poster .art { transition: none; }
+}
+/* Browsers without backdrop blur: darker panes so text stays readable. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  body.glass .win { background: rgba(28, 28, 36, .9); }
+}
+
+/* Phones: one column, the menu becomes a tab bar along the bottom. */
+@media (max-width: 820px) {
+  body.glass .layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto auto; padding: 10px; gap: 10px; }
+  body.glass #main { grid-column: 1; grid-row: 1; padding: 14px; }
+  body.glass .side { grid-column: 1; grid-row: 2; }
+  body.glass .side { gap: 8px; }
+  body.glass .side .spacer, body.glass #info .info-row { display: none; }
+  body.glass #info { order: 2; padding: 0; background: none; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+  body.glass button.mode { margin: 0; }
+  body.glass #menu { flex-direction: row; overflow-x: auto; scrollbar-width: none; padding: 6px; border-radius: 26px; }
+  body.glass #menu::-webkit-scrollbar { display: none; }
+  body.glass .menu-item { flex: none; width: auto; min-height: 38px; padding: 0 14px; font-size: 14px; }
+  body.glass #statusbar { grid-column: 1; grid-row: 3; min-height: 40px; }
+  body.glass .tabs { flex: 0 1 auto; max-width: 100%; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding: 2px; }
+  body.glass .tabs::-webkit-scrollbar { display: none; }
+  body.glass .split { flex-direction: column; }
+  body.glass .subnav { width: auto; display: flex; overflow-x: auto; gap: 4px; flex: none; }
+  body.glass .sub-item { flex: none; width: auto; }
+  body.glass .field { flex-wrap: wrap; }
+  body.glass .field .ctl { max-width: 100%; flex-wrap: wrap; }
+  body.glass .menu { left: auto; right: 0; }
+  body.glass #toasts { bottom: 130px; }
+}
+
+/* Liquid Glass: this app's own pieces. */
+body.glass button.on { color: #4ee07a; }
+body.glass button.off { color: #ff6961; }
+body.glass .party { border-bottom: 1px solid var(--line); padding: 12px 6px; border-radius: 16px; transition: background-color .3s ease; }
+body.glass .party:hover { background: rgba(255, 255, 255, .04); }
+body.glass .party .name { font-size: 19px; font-weight: 700; }
+body.glass .party .tag { font-weight: 600; letter-spacing: .02em; }
+body.glass .bar { height: 6px; border: 0; border-radius: 3px; background: rgba(118, 118, 128, .3); }
+body.glass .bar > i { border-radius: 3px; background: var(--accent); box-shadow: none; }
+body.glass .tag-btn, body.glass #theme-pick .picked, body.glass #engine-pick .picked { background: var(--accent); color: #fff; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35), 0 0 0 1px rgba(0, 0, 0, .35); }
+body.glass .tag-btn:hover:not(:disabled), body.glass #theme-pick .picked:hover:not(:disabled), body.glass #engine-pick .picked:hover:not(:disabled) { background: #2a95ff; }
+body.glass #theme-pick, body.glass #engine-pick { gap: 6px; }
+body.glass details.advanced > summary { color: var(--dim); font-weight: 600; }
+body.glass .saved { color: var(--good); }
+body.glass th { position: sticky; }
+body.glass .label { text-transform: none; }
+body.glass .footer { flex-wrap: wrap; }
+body.glass .footer button, body.glass .page-head button { white-space: nowrap; }
+body.glass .party .title { flex-wrap: wrap; row-gap: 4px; }
+body.glass .party .tag, body.glass .tag { white-space: nowrap; }
+body.glass .party .actions { flex-wrap: wrap; }

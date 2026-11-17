@@ -72,6 +72,22 @@ function hideOverlay() { $("#overlay").classList.remove("open"); }
 
 // ---------- menu ----------
 
+/** Liquid Glass: move the menu's selection pill under the open page. The
+ * pill is the menu's ::before, so it glides there with a CSS transition. */
+function glassPill() {
+  const nav = $("#menu");
+  if (!nav) return;
+  const cur = nav.querySelector(".menu-item.selected");
+  nav.classList.toggle("has-sel", !!cur);
+  if (!cur) return;
+  nav.style.setProperty("--sel-top", cur.offsetTop + "px");
+  nav.style.setProperty("--sel-left", cur.offsetLeft + "px");
+  nav.style.setProperty("--sel-w", cur.offsetWidth + "px");
+  nav.style.setProperty("--sel-h", cur.offsetHeight + "px");
+}
+addEventListener("resize", glassPill);
+
+
 function buildMenu() {
   const nav = $("#menu");
   nav.innerHTML = PAGES.map(([id, label]) =>
@@ -299,13 +315,15 @@ let greenCursor = 0;      // highlighted entry there
 const isGreen = () => document.body.classList.contains("green");
 
 function applyTheme(theme) {
-  const green = theme === "green", blades = theme === "blades";
-  const key = blades ? "blades" : green ? "green" : "ff";
+  const green = theme === "green", blades = theme === "blades", glass = theme === "glass";
+  const key = glass ? "glass" : blades ? "blades" : green ? "green" : "ff";
   $$("#theme-pick [data-theme]").forEach((b) => b.classList.toggle("picked", b.dataset.theme === key));
   if (document.body.dataset.themed === key) return;
   document.body.dataset.themed = key;
   document.body.classList.toggle("green", green);
   document.body.classList.toggle("blades", blades);
+  document.body.classList.toggle("glass", glass);
+  requestAnimationFrame(glassPill);
   if (blades) {
     greenHome = false;
     document.body.classList.remove("g-at-home");
@@ -395,6 +413,7 @@ function go(id) {
   if (isBlades()) bladesShow(id);
   const menuId = HIDDEN_PAGES[id] || id;
   $$(".menu-item").forEach((b) => b.classList.toggle("selected", b.dataset.go === menuId));
+  glassPill();
   $$(".page").forEach((p) => p.classList.toggle("active", p.dataset.page === id));
   history.replaceState(null, "", "#" + id);
   const title = $("#g-title");

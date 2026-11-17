@@ -114,7 +114,7 @@ impl Config {
         self.poll_interval_seconds = self.poll_interval_seconds.clamp(30, 86_400);
         self.concurrent_downloads = self.concurrent_downloads.clamp(1, MAX_CONCURRENT_DOWNLOADS);
         self.minimum_score = self.minimum_score.min(100);
-        if self.theme != "green" && self.theme != "blades" {
+        if self.theme != "green" && self.theme != "blades" && self.theme != "glass" {
             self.theme = "ff".into();
         }
         self.providers.retain(|p| PROVIDERS.contains(&p.as_str()));
