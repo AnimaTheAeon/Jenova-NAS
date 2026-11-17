@@ -371,14 +371,43 @@ function greenMarkCursor() {
 function greenOpen(i) {
   greenCursor = i;
   greenMarkCursor();
+  if (calm()) {
+    greenHome = false;
+    document.body.classList.remove("g-at-home");
+    go(PAGES[i][0]);
+    return;
+  }
   document.body.classList.add("g-zoom");
   setTimeout(() => {
     greenHome = false;
     document.body.classList.remove("g-at-home", "g-zoom");
     go(PAGES[i][0]);
     document.body.classList.add("g-reveal");
-    setTimeout(() => document.body.classList.remove("g-reveal"), 320);
-  }, 280);
+    setTimeout(() => document.body.classList.remove("g-reveal"), 500);
+  }, 600);
+}
+
+/** Xbox page bar: a tab per page along the bottom, to switch pages without the home screen. */
+function renderPageBar() {
+  const cur = HIDDEN_PAGES[page] || page;
+  $("#g-tabs").replaceChildren(...PAGES.map(([id, label], i) => {
+    const b = document.createElement("button");
+    b.className = "g-nav";
+    b.textContent = label;
+    b.setAttribute("aria-current", id === cur ? "page" : "false");
+    b.onclick = () => {
+      if (id === page) return;
+      greenCursor = i;
+      go(id);
+      if (!calm()) {
+        document.body.classList.remove("g-switch");
+        void document.body.offsetWidth;
+        document.body.classList.add("g-switch");
+        setTimeout(() => document.body.classList.remove("g-switch"), 300);
+      }
+    };
+    return b;
+  }));
 }
 
 function greenBack() {
@@ -391,9 +420,9 @@ function greenShowHome(animate) {
   greenCursor = Math.max(0, PAGES.findIndex(([p]) => p === (HIDDEN_PAGES[page] || page)));
   greenMarkCursor();
   document.body.classList.add("g-at-home");
-  if (animate) {
+  if (animate && !calm()) {
     document.body.classList.add("g-unzoom");
-    setTimeout(() => document.body.classList.remove("g-unzoom"), 320);
+    setTimeout(() => document.body.classList.remove("g-unzoom"), 600);
   }
 }
 
@@ -418,6 +447,7 @@ function go(id) {
   history.replaceState(null, "", "#" + id);
   const title = $("#g-title");
   if (title) title.textContent = (PAGES.find(([p]) => p === id) || [id, id === "log" ? "Log" : id])[1].toUpperCase();
+  if ($("#g-tabs")) renderPageBar();
   refresh();
 }
 

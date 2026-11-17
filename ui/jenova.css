@@ -315,7 +315,8 @@ body.green #g-head { display: flex; align-items: center; justify-content: space-
 
 /* ESC / ENTER hints */
 #g-foot { display: none; }
-body.green #g-foot { display: flex; justify-content: flex-end; align-items: center; }
+body.green #g-foot { display: flex; justify-content: flex-end; align-items: center; gap: 14px; }
+body.green #g-foot .g-hint { flex: none; }
 .g-hint { display: flex; align-items: center; gap: 12px; background: none; border: 0; color: #bef27e; font: 800 17px "Orbitron", sans-serif; padding: 0; }
 .g-hint:hover:not(:disabled) { background: none; color: #f2ffb8; }
 .g-key {
@@ -368,13 +369,26 @@ body.green #g-foot { display: flex; justify-content: flex-end; align-items: cent
 #g-home .g-status-home { position: absolute; left: 2%; bottom: 4%; width: 44%; }
 #g-home .g-select { position: absolute; right: 6%; bottom: 4%; }
 
-/* transitions: zoom into the orb, page coming out of the glow */
-body.g-zoom #g-home { animation: g-zoom-in 0.28s ease-in forwards; }
-@keyframes g-zoom-in { to { transform: scale(2.4); transform-origin: 32% 52%; opacity: 0; filter: brightness(2); } }
-body.g-reveal .layout { animation: g-reveal 0.32s ease-out; }
-@keyframes g-reveal { from { transform: scale(0.92); opacity: 0; filter: brightness(2.2); } }
-body.g-unzoom #g-home { animation: g-unzoom 0.32s ease-out; }
-@keyframes g-unzoom { from { transform: scale(2.4); transform-origin: 32% 52%; opacity: 0; } }
+/* transitions: the home screen drifts closer and fades into the dark, the page
+   fades in out of it. No bright flashes (slow, gentle fades only). */
+body.g-zoom #g-home { animation: g-zoom-in 0.6s ease-in-out forwards; }
+@keyframes g-zoom-in { to { transform: scale(1.25); transform-origin: 32% 52%; opacity: 0; } }
+body.g-reveal .layout { animation: g-reveal 0.5s ease-out; }
+@keyframes g-reveal { from { opacity: 0; } }
+body.g-unzoom #g-home { animation: g-unzoom 0.6s ease-in-out; }
+@keyframes g-unzoom { from { transform: scale(1.25); transform-origin: 32% 52%; opacity: 0; } }
+body.g-switch .layout { animation: g-switch 0.3s ease-out; }
+@keyframes g-switch { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { body.g-zoom #g-home, body.g-reveal .layout, body.g-unzoom #g-home, body.g-switch .layout { animation: none; } }
+
+/* Page bar: one tab per page along the bottom (never on the home screen). */
+#g-tabs { display: flex; gap: 8px; flex: 1; min-width: 0; flex-wrap: wrap; }
+.g-nav { position: relative; isolation: isolate; border: 0; padding: 7px 16px; min-width: 110px; font: 800 12px "Orbitron", sans-serif; text-transform: uppercase; color: #bef27e; background: rgba(150, 240, 70, .5) !important; text-shadow: none; cursor: pointer; clip-path: polygon(9px 0, 100% 0, 100% calc(100% - 9px), calc(100% - 9px) 100%, 0 100%, 0 9px); }
+.g-nav::before { content: ""; position: absolute; inset: 1px; z-index: -1; background: linear-gradient(#24700e, #0c3406); clip-path: polygon(8.5px 0, 100% 0, 100% calc(100% - 8.5px), calc(100% - 8.5px) 100%, 0 100%, 0 8.5px); }
+.g-nav:hover, .g-nav:focus-visible { color: #e6ffb4; background: rgba(170, 255, 90, .85) !important; outline: none; }
+.g-nav[aria-current="page"] { color: #0a2a04; background: #f2ff9a !important; }
+.g-nav[aria-current="page"]::before { background: linear-gradient(#e2ff6a, #8cc81c); }
+@media (max-width: 820px) { #g-tabs { flex-wrap: nowrap; gap: 5px; overflow-x: auto; } .g-nav { min-width: 0; padding: 7px 9px; font-size: 10.5px; flex: none; } }
 
 /* =====================================================================
    Blades: glossy silver blades, the open one wears its color (same look as Turks and Lifestream's NAS pages).
