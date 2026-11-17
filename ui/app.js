@@ -541,11 +541,15 @@ function renderUpdate(u) {
   if (u.current) seenVersion = u.current;
   const st = $("#update-state");
   const checked = u.checked_at ? ` <span class="dim small">· checked ${ago(u.now - u.checked_at)}</span>` : "";
-  if (u.checking) st.innerHTML = `Installed ${esc(u.current)} · <span class="warn">Checking GitHub…</span>`;
-  else if (u.error) st.innerHTML = `Installed ${esc(u.current)} · <span class="bad">Couldn't check GitHub</span>${checked}`;
-  else if (u.available) st.innerHTML = `Installed ${esc(u.current)} · <span class="warn">Version ${esc(u.latest)} is out</span> <a href="${esc(u.page)}" target="_blank" rel="noopener">see release</a>${checked}`;
+  if (u.checking) st.innerHTML = `Installed ${esc(u.current)} · <span class="warn">Checking for updates…</span>`;
+  else if (u.error) st.innerHTML = `Installed ${esc(u.current)} · <span class="bad">Couldn't check for updates</span> <span class="dim small">${esc(u.error)}</span>${checked}`;
+  else if (u.available) st.innerHTML = `Installed ${esc(u.current)} · <span class="warn">Version ${esc(u.latest)} is out</span>${checked}`;
   else if (u.latest) st.innerHTML = `Installed ${esc(u.current)} · <span class="good">Up to date</span>${checked}`;
   else st.innerHTML = `Installed ${esc(u.current)}`;
+  const notes = $("#update-notes");
+  const text = u.available && u.notes ? u.notes.trim() : "";
+  notes.style.display = text ? "" : "none";
+  if (notes.dataset.text !== text) { notes.dataset.text = text; $("#update-notes-text").textContent = text; }
   $("#update-check").disabled = !!u.checking;
   const pr = u.progress;
   const busy = !!(pr && pr.phase !== "failed");
