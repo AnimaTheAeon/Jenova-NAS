@@ -229,7 +229,7 @@ details.advanced[open] > summary::before { content: "▾ "; }
 details.advanced > .section { margin-left: 14px; }
 
 /* =================================================================
-   Box of X look (body.green)
+   Xbox look (body.green)
    ================================================================= */
 @font-face {
   font-family: "Orbitron";
@@ -505,8 +505,8 @@ body.blades .bbody th:first-child { border-radius: 14px 0 0 0; }
 body.blades .bbody th:last-child { border-radius: 0 14px 0 0; }
 
 /* =====================================================================
-   Liquid Glass (dark): frosted panes over a dark, softly lit backdrop,
-   capsule controls, iOS switches and springy motion. Everything hangs off
+   Dark Glass (dark): frosted panes over a dark, softly lit backdrop,
+   capsule controls, toggle switches and springy motion. Everything hangs off
    body.glass. Spring: cubic-bezier(.32,.72,0,1).
    ===================================================================== */
 html:has(body.glass) { background: #04050a; }
@@ -526,7 +526,7 @@ body.glass {
 body.glass a { color: var(--info); }
 body.glass button, body.glass .btn, body.glass input, body.glass select, body.glass textarea, body.glass .menu-item, body.glass .sub-item { font-family: inherit; text-shadow: none; }
 
-/* Layout: sidebar on the left, like an iPad app. */
+/* Layout: sidebar on the left, like a tablet app. */
 body.glass .layout { grid-template-columns: 236px minmax(0, 1fr); gap: 14px; padding: 16px; }
 body.glass .side { grid-column: 1; grid-row: 1; }
 body.glass #main { grid-column: 2; grid-row: 1; }
@@ -579,7 +579,7 @@ body.glass button.pill.on { background: rgba(255, 255, 255, .24); box-shadow: in
 body.glass button.link, body.glass button.x, body.glass .menu-item, body.glass .sub-item { box-shadow: none; }
 body.glass button.link { min-height: 0; padding: 0; background: none; color: var(--info); }
 body.glass button.x { min-height: 0; padding: 0 4px; background: none; color: var(--bad); }
-/* ON/OFF buttons become iOS switches (the button keeps its click and its text for screen readers). */
+/* ON/OFF buttons become toggle switches (the button keeps its click and its text for screen readers). */
 body.glass button.toggle { position: relative; width: 51px; min-width: 51px; height: 31px; min-height: 31px; padding: 0; border-radius: 16px; font-size: 0; color: transparent; background: rgba(120, 120, 128, .36); box-shadow: none; transition: background-color .35s ease; }
 body.glass button.toggle::before { content: ""; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%; background: #fff; box-shadow: 0 3px 8px rgba(0, 0, 0, .3); transition: transform .45s var(--spring); }
 body.glass button.toggle.on { background: var(--good); }
@@ -597,7 +597,7 @@ body.glass select { padding-right: 32px; -webkit-appearance: none; appearance: n
 body.glass select option { background: #1c1c24; color: #fff; }
 body.glass input:focus, body.glass select:focus, body.glass textarea:focus { box-shadow: inset 0 0 0 2px var(--accent); }
 body.glass input::placeholder, body.glass textarea::placeholder { color: rgba(235, 235, 245, .4); }
-/* Check boxes become iOS switches too. */
+/* Check boxes become toggle switches too. */
 body.glass label.check .box { width: 51px; height: 31px; border: 0; border-radius: 16px; background: rgba(120, 120, 128, .36); transition: background-color .35s ease; }
 body.glass label.check .box::before { content: ""; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%; background: #fff; box-shadow: 0 3px 8px rgba(0, 0, 0, .3); transition: transform .45s var(--spring); }
 body.glass label.check input:checked + .box { background: var(--good); border: 0; }
@@ -605,7 +605,7 @@ body.glass label.check input:checked + .box::before { transform: translateX(20px
 body.glass label.check input:checked + .box::after { display: none; }
 body.glass label.check input:focus-visible + .box { box-shadow: 0 0 0 2px var(--accent); }
 
-/* Settings rows: grouped, with hairlines like an iOS list. */
+/* Settings rows: grouped, with hairlines like a settings list. */
 body.glass .field { padding: 10px 0; border-bottom: 1px solid var(--line); gap: 16px; }
 body.glass .field .lbl .name { font-weight: 600; }
 body.glass .field .lbl .help { font-weight: 400; color: var(--dim); }
@@ -739,7 +739,7 @@ body.glass.calm #menu::before, body.glass.calm button, body.glass.calm button::b
   body.glass #toasts { bottom: 130px; }
 }
 
-/* Liquid Glass: this app's own pieces. */
+/* Dark Glass: this app's own pieces. */
 body.glass button.on { color: #4ee07a; }
 body.glass button.off { color: #ff6961; }
 body.glass .party { border-bottom: 1px solid var(--line); padding: 12px 6px; border-radius: 16px; transition: background-color .3s ease; }

@@ -77,7 +77,7 @@ pub struct Config {
     pub concurrent_downloads: usize,
     /// Let the Task Scheduler task install new versions from GitHub.
     pub auto_update: bool,
-    /// Window look: "ff" (FFVII menu) or "green" (Box of X).
+    /// Window look: "ff" (FFVII menu) or "green" (Xbox).
     pub theme: String,
 }
 
