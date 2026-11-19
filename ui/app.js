@@ -308,6 +308,131 @@ for (const type of ["mousedown", "mouseup"]) {
 }
 addEventListener("resize", () => { if (isBlades()) bladesPlace(true); });
 
+// ---------- MC360 look ----------
+// The MC360 dashboard skin's blades, one per page, each with a menu of what
+// that page holds. Picking an entry opens the page on the blade (the same
+// page as in every other look) and jumps to that part of it. The drawing,
+// sounds and keys come from the shared engine in mc360/.
+
+let mc = null;          // the running engine, while the look is MC360
+let mcLoading = null;
+const isMc360 = () => !!mc;
+const MC_LOOKS = [["ff", "FFVII Menu"], ["green", "Xbox"], ["blades", "Blades"], ["glass", "Dark Glass"], ["mc360", "MC360"]];
+const MC_BLADES = [
+  { key: "watch", color: "green", items: [
+    { id: "watch", label: "Watched folders", icon: "folder", hint: "Folders Jenova keeps an eye on.", page: "watch" },
+    { id: "add-folder", label: "Add folder…", icon: "plus", hint: "Watch another folder.", page: "watch", click: "#add-folder" },
+    { id: "check-now", label: "Check existing files", icon: "refresh", hint: "Look through the watched folders now.", page: "watch", click: "#check-now" },
+    { id: "scan-once", label: "Scan a folder once…", icon: "search", hint: "Get subtitles for a folder you don't want to watch.", page: "watch", click: "#scan-once" },
+  ] },
+  { key: "activity", color: "orange", items: [
+    { id: "activity", label: "Recent", icon: "clock", hint: "What was downloaded, and what is still waiting.", page: "activity" },
+    { id: "clear-jobs", label: "Clear finished", icon: "trash", hint: "Tidy the list.", page: "activity", click: "#clear-jobs" },
+  ] },
+  { key: "settings", color: "purple", items: [
+    { id: "languages", label: "Languages", icon: "cc", hint: "Which subtitles to fetch.", page: "config", section: "LANGUAGES" },
+    { id: "watching", label: "Watching", icon: "eye", hint: "How new videos are noticed.", page: "config", section: "WATCHING" },
+    { id: "downloads", label: "Downloads", icon: "down", hint: "How many at once, and when to try again.", page: "config", section: "DOWNLOADS" },
+    { id: "sites", label: "Subtitle sites", icon: "net", hint: "Where subtitles come from.", page: "config", section: "SUBTITLE SITES" },
+    { id: "updates", label: "Updates", icon: "refresh", hint: "Check now and Update now.", page: "config", section: "UPDATES" },
+    { id: "look", label: "Look and sound", icon: "palette", hint: "Five looks; MC360's skin and sounds are in the guide (G).", page: "config", section: "LOOK" },
+    { id: "advanced", label: "Advanced", icon: "gear", hint: "Matching, live watching, Subliminal, backups.", page: "config", open: "#advanced" },
+  ] },
+  { key: "log", color: "grey", items: [
+    { id: "log", label: "Log", icon: "doc", hint: "Detailed log.", page: "log" },
+  ] },
+];
+const mcBladeOf = (id) => Math.max(0, MC_BLADES.findIndex((b) => b.items.some((it) => it.page === id)));
+let mcItem = null;      // the entry being opened from the menu
+
+function mcSection(label) {
+  return $$(".page.active .section > .label").find((l) => l.textContent.trim() === label);
+}
+
+function mcLoad() {
+  if (window.MC360) return Promise.resolve();
+  if (mcLoading) return mcLoading;
+  const css = document.createElement("link");
+  css.rel = "stylesheet"; css.href = "mc360/mc360.css?v=" + mcVersion();
+  document.head.append(css);
+  mcLoading = new Promise((resolve, reject) => {
+    const js = document.createElement("script");
+    js.src = "mc360/mc360.js?v=" + mcVersion();
+    js.onload = resolve; js.onerror = reject;
+    document.head.append(js);
+  });
+  return mcLoading;
+}
+function mcVersion() {
+  const tag = $('script[src^="app.js"]');
+  return tag ? new URL(tag.src, location.href).searchParams.get("v") || "" : "";
+}
+
+async function mcOn() {
+  if (mc) return;
+  try { await mcLoad(); } catch (e) { $("#statusbar").textContent = "The MC360 look couldn't load its files."; return; }
+  if (mc || !config || config.theme !== "mc360") return;
+  mc = MC360.mount({
+    base: "mc360/",
+    app: { name: "Jenova", plat: "NAS", ver: mcVersion(), icon: "cc" },
+    blades: MC_BLADES,
+    card: () => {
+      const s = status || {};
+      const lines = [$("#statusbar").textContent];
+      if (s.folders) lines.push(`${s.folders.length} folder${s.folders.length === 1 ? "" : "s"} watched`);
+      if (s.found_today !== undefined) lines.push(`${Number(s.found_today).toLocaleString()} found today`);
+      return lines;
+    },
+    host: () => $("#main"),
+    onOpen: (b, item) => { mcItem = item; go(item.page); },
+    beforeBack: () => { if (page === "log") { go("config"); return true; } return false; },
+    popupOpen: () => !!$(".modal.open, .overlay-msg.open, #overlay.open"),
+    looks: MC_LOOKS.map(([, l]) => l),
+    setLook: (label) => {
+      const key = (MC_LOOKS.find(([, l]) => l === label) || ["ff"])[0];
+      if (key === config.theme) return;
+      config.theme = key;
+      applyTheme(key);
+      queueSave({ theme: key });
+    },
+    checkUpdates: async () => {
+      await api("update/check", {});
+      for (let i = 0; i < 20; i++) {
+        await new Promise((r) => setTimeout(r, 500));
+        await refreshStatus();
+        if (!$("#update-check").disabled) break;
+      }
+      return $("#update-state").textContent || "Checked for updates";
+    },
+  });
+  mc.host.classList.add("bbody");
+  const blade = mcBladeOf(HIDDEN_PAGES[page] || page);
+  if (page === "watch") mc.home(blade); else mc.showPage(blade, (MC_BLADES[blade].items.find((it) => it.page === page) || {}).id);
+}
+
+function mcOff() {
+  if (!mc) return;
+  mc.destroy();
+  mc = null;
+}
+
+/** After go(): show the page on its blade, and jump to the picked part of it. */
+function mcShow(id) {
+  if (!mc) return;
+  const it = mcItem && mcItem.page === id ? mcItem : null;
+  mcItem = null;
+  const blade = mcBladeOf(HIDDEN_PAGES[id] || id);
+  const first = MC_BLADES[blade].items.find((x) => x.page === id) || MC_BLADES[blade].items[0];
+  mc.showPage(blade, (it || first).id);
+  if (!it) { mc.host.scrollTop = 0; return; }
+  requestAnimationFrame(() => {
+    if (it.open) { const d = $(it.open); if (d) { d.open = true; d.scrollIntoView({ block: "start" }); } }
+    else if (it.section) { const l = mcSection(it.section); if (l) l.parentElement.scrollIntoView({ block: "start" }); }
+    else mc.host.scrollTop = 0;
+    if (it.click) { const b = $(it.click); if (b && !b.disabled) b.click(); }
+  });
+}
+
 // ---------- Xbox look ----------
 
 let greenHome = true;     // on the orb's home screen
@@ -315,8 +440,8 @@ let greenCursor = 0;      // highlighted entry there
 const isGreen = () => document.body.classList.contains("green");
 
 function applyTheme(theme) {
-  const green = theme === "green", blades = theme === "blades", glass = theme === "glass";
-  const key = glass ? "glass" : blades ? "blades" : green ? "green" : "ff";
+  const green = theme === "green", blades = theme === "blades", glass = theme === "glass", mc360 = theme === "mc360";
+  const key = mc360 ? "mc360" : glass ? "glass" : blades ? "blades" : green ? "green" : "ff";
   $$("#theme-pick [data-theme]").forEach((b) => b.classList.toggle("picked", b.dataset.theme === key));
   if (document.body.dataset.themed === key) return;
   document.body.dataset.themed = key;
@@ -324,6 +449,14 @@ function applyTheme(theme) {
   document.body.classList.toggle("blades", blades);
   document.body.classList.toggle("glass", glass);
   requestAnimationFrame(glassPill);
+  if (mc360) {
+    greenHome = false;
+    document.body.classList.remove("g-at-home");
+    bladesOff();
+    mcOn();
+    return;
+  }
+  mcOff();
   if (blades) {
     greenHome = false;
     document.body.classList.remove("g-at-home");
@@ -444,6 +577,7 @@ function go(id) {
   $$(".menu-item").forEach((b) => b.classList.toggle("selected", b.dataset.go === menuId));
   glassPill();
   $$(".page").forEach((p) => p.classList.toggle("active", p.dataset.page === id));
+  mcShow(id);
   history.replaceState(null, "", "#" + id);
   const title = $("#g-title");
   if (title) title.textContent = (PAGES.find(([p]) => p === id) || [id, id === "log" ? "Log" : id])[1].toUpperCase();

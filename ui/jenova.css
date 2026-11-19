@@ -760,3 +760,25 @@ body.glass .footer button, body.glass .page-head button { white-space: nowrap; }
 body.glass .party .title { flex-wrap: wrap; row-gap: 4px; }
 body.glass .party .tag, body.glass .tag { white-space: nowrap; }
 body.glass .party .actions { flex-wrap: wrap; }
+
+/* ---------- MC360 look ----------
+   The engine (mc360/) draws the skin's blades, menus, guide and sounds. The
+   page itself sits on the open blade in a dark see-through pane, styled like
+   the Blades look's page (white text on glass), which hangs off .bbody. */
+.mc360-root .mc-host.bbody { opacity: 1; transform: none; transition: none; padding: 10px 14px; background: rgba(8, 12, 22, .5); border: 1px solid rgba(255, 255, 255, .3); border-radius: 10px; --band: rgba(0, 0, 0, .35); }
+.mc360-root .mc-host.bbody #main.win { overflow: visible; }
+body.mc360 .modal, body.mc360 .overlay-msg { z-index: 1000; }
+body.mc360 .modal .win { background: linear-gradient(160deg, #4a4466, #2e2a44); border: 1px solid rgba(255, 255, 255, .55); border-radius: 18px; box-shadow: 0 8px 24px rgba(0, 0, 0, .45); }
+body.mc360 .modal button, body.mc360 .modal input, body.mc360 .modal select, body.mc360 .modal textarea { border-radius: 14px; }
+body.mc360 .bbody .tag-btn, body.mc360 .bbody #theme-pick .picked, body.mc360 .bbody #engine-pick .picked { background: linear-gradient(180deg, rgba(255, 255, 255, .36) 0%, rgba(255, 255, 255, .16) 48%, rgba(255, 255, 255, .08) 52%, rgba(255, 255, 255, .2) 100%); border-color: rgba(255, 255, 255, .7); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .75), 0 0 12px rgba(255, 255, 255, .22); color: #ffffff; text-shadow: none; font-weight: 700; }
+body.mc360 .modal { background: rgba(40, 40, 48, .35); }
+body.mc360 .overlay-msg { background: rgba(40, 40, 48, .45); }
+body.mc360 .overlay-msg .win { background: linear-gradient(160deg, #4a4466, #2e2a44); border: 1px solid rgba(255, 255, 255, .55); border-radius: 18px; box-shadow: 0 8px 24px rgba(0, 0, 0, .45); }
+body.mc360 .modal button, body.mc360 .overlay-msg button { color: #ffffff; text-shadow: none; padding: 5px 16px; background: linear-gradient(180deg, rgba(255, 255, 255, .22), rgba(255, 255, 255, .06)); border: 1px solid rgba(255, 255, 255, .5); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .4); }
+body.mc360 .modal button:hover:not(:disabled) { background: linear-gradient(180deg, rgba(255, 255, 255, .36), rgba(255, 255, 255, .14)); border-color: rgba(255, 255, 255, .85); }
+body.mc360 .modal button.big { background: linear-gradient(180deg, rgba(255, 255, 255, .42), rgba(255, 255, 255, .16)); border-color: rgba(255, 255, 255, .85); }
+body.mc360 .modal .picker-item:hover { background: rgba(255, 255, 255, .14); }
+body.mc360 .modal { --text: #ffffff; --dim: rgba(255, 255, 255, .8); --label: #eef2ff; text-shadow: none; }
+body.mc360 .bbody th { background: var(--band); color: #ffffff; font-size: 14px; padding: 9px 10px; border-bottom: 2px solid rgba(255, 255, 255, .6); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .25), 0 3px 8px rgba(0, 0, 0, .25); }
+body.mc360 .bbody th:first-child { border-radius: 14px 0 0 0; }
+body.mc360 .bbody th:last-child { border-radius: 0 14px 0 0; }
