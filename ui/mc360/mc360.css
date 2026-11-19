@@ -1,8 +1,15 @@
 /* MC360 look: shared stylesheet. Font path is relative to this file's folder. */
 @font-face { font-family: "MC360"; src: url("mc360.ttf") format("truetype"); font-display: swap; }
-body.mc360 { overflow: hidden; }
-.mc360-root { position: fixed; inset: 0; z-index: 900; background: #000; overflow: hidden; font-family: "MC360", Tahoma, "Segoe UI", sans-serif; color: #fff; user-select: none; -webkit-user-select: none; }
+/* Pages: the app's own font, without the FFVII text shadow (as in Blades). */
+body.mc360 { overflow: hidden; text-shadow: none; }
+.mc360-root { position: fixed; inset: 0; z-index: 900; background: #000; overflow: hidden; user-select: none; -webkit-user-select: none; }
 .mc360-root .mc-stage { position: absolute; left: 0; top: 0; height: 576px; transform-origin: 0 0; overflow: hidden; pointer-events: none; }
+/* The skin's own text: never the app's bold body font, shadow or spacing. */
+.mc360-root .mc-stage { font-family: "MC360", Tahoma, "Segoe UI", sans-serif; font-weight: 400; font-style: normal; font-variant: normal; color: #fff; text-shadow: none; letter-spacing: normal; word-spacing: normal; text-transform: none; text-align: left; line-height: normal; }
+/* Click zones stay invisible whatever the app's own button styles say. */
+.mc360-root .mc-hit, .mc360-root .mc-hit:hover, .mc360-root .mc-hit:active, .mc360-root .mc-hit:focus, .mc360-root .mc-hit:disabled { background: transparent !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; padding: 0 !important; margin: 0 !important; min-width: 0 !important; min-height: 0 !important; color: transparent !important; text-shadow: none !important; filter: none !important; opacity: 1 !important; transform: none !important; transition: none !important; -webkit-appearance: none !important; appearance: none !important; outline: none; }
+.mc360-root .mc-hit::before, .mc360-root .mc-hit::after { content: none !important; display: none !important; }
+.mc360-root .mc-stage img, .mc360-root .mc-stage video { max-width: none !important; max-height: none !important; border: 0 !important; border-radius: 0 !important; padding: 0 !important; margin: 0 !important; box-shadow: none !important; filter: none !important; }
 .mc360-root .mc-front { z-index: 4; }
 .mc360-root .mc-stage .mc-hit, .mc360-root .mc-scrim, .mc360-root .mc-guide { pointer-events: auto; }
 .mc360-root .mc-layer { position: absolute; inset: 0; pointer-events: none; }
@@ -13,13 +20,13 @@ body.mc360 { overflow: hidden; }
 .mc360-root .mc-spr img { position: absolute; max-width: none; display: block; }
 .mc360-root .mc-rect { position: absolute; pointer-events: none; }
 .mc360-root .mc-txt { position: absolute; white-space: nowrap; pointer-events: none; line-height: 1; }
-.mc360-root .mc-hit { position: absolute; background: transparent; border: 0; padding: 0; margin: 0; cursor: pointer; }
+.mc360-root .mc-hit { position: absolute; cursor: pointer; }
 .mc360-root .mc-hit:focus-visible { outline: 2px solid #fff; outline-offset: -2px; }
 .mc360-root .mc-swirl { position: absolute; object-fit: cover; pointer-events: none; }
 .mc360-root .mc-still { display: none; }
 .mc360-root .mc-shine { position: absolute; pointer-events: none; z-index: 10; }
 .mc360-root .tr, .mc360-root .trf .ft { transition: left .7s cubic-bezier(.22,.9,.25,1), top .7s cubic-bezier(.22,.9,.25,1), width .7s cubic-bezier(.22,.9,.25,1), height .7s cubic-bezier(.22,.9,.25,1), opacity .5s ease; }
-.mc360-root .mc-host { position: absolute; z-index: 3; overflow: auto; display: flex; flex-direction: column; box-sizing: border-box; visibility: hidden; pointer-events: none; color: #fff; text-shadow: none; font-family: "Segoe UI", Tahoma, sans-serif; user-select: text; -webkit-user-select: text; }
+.mc360-root .mc-host { position: absolute; z-index: 3; overflow: auto; display: flex; flex-direction: column; box-sizing: border-box; visibility: hidden; pointer-events: none; user-select: text; -webkit-user-select: text; }
 .mc360-root.mc-paged .mc-host { visibility: visible; pointer-events: auto; }
 .mc360-root .mc-scrim { position: absolute; left: 0; top: 0; width: 100%; height: 576px; background: rgba(0,0,0,.8); animation: mcFade .3s ease; }
 .mc360-root .mc-guide { position: absolute; left: 0; top: 0; width: 390px; height: 576px; animation: mcGuide .25s cubic-bezier(.22,.9,.25,1); }

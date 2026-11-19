@@ -174,7 +174,9 @@
       var res = [], n = N();
       var depth = function (d, side) { return d === 1 ? 'blades-size3-' + side + '-nf' : d === 2 ? 'blades-size2-' + side + '-nf' : 'blades-size1-' + side + '-nf'; };
       for (var i = 0; i < n; i++) {
-        if (i === b) res.push({ x: tier === 1 ? 18 + 35 * b : -40, tex: 'blades-size4-header', side: 'h' });
+        // On a page the open blade moves to the first slot (fully on screen, like
+        // the first blade's menu); the others slide off both edges.
+        if (i === b) res.push({ x: tier === 1 ? 18 + 35 * b : 18, tex: 'blades-size4-header', side: 'h' });
         else if (i < b) res.push({ x: tier === 1 ? 18 + 35 * i : -120 - 35 * (b - i), tex: depth(b - i, 'left'), side: 'l' });
         else res.push({ x: tier === 1 ? xr(i) : W + 40 + 35 * (i - b), tex: depth(i - b, 'right'), side: 'r' });
       }
@@ -206,8 +208,8 @@
       T.frameRects.push(R(x0 + 40, 0, we - 20 - (x0 + 40), 64, GR['bkgd-whitewash-glass-top-middle'], 3, fade));
       T.frameRects.push(R(x0 + 40, 512, we - 20 - (x0 + 40), 64, GR['bkgd-whitewash-glass-bottom-middle'], 3, fade));
       if (into) return;
-      out.runners.push(S(v + ':blades-runner-left', tier === 1 ? -61 : -119, 0, 128, 576, 20));
-      out.runners.push(S(v + ':blades-runner-right', tier === 1 ? W - 55 : W + 40, 0, 128, 576, 20));
+      out.runners.push(S(v + ':blades-runner-left', -61, 0, 128, 576, 20));
+      out.runners.push(S(v + ':blades-runner-right', W - 55, 0, 128, 576, 20));
       var hz = HAZE[col] ? col : 'blue', show = !!HAZE[col] && tier === 1;
       out.hazes.push(S('haze-' + hz + '-left', x0 - 88, 350, 150, 228, 80, show ? '' : 'opacity:0'));
       out.hazes.push(S('haze-' + hz + '-right', end - 41, 350, 150, 228, 80, show ? '' : 'opacity:0'));
@@ -220,7 +222,7 @@
         out.bladeItems.push({ z: z, s: S(v + ':' + P.tex, P.x, 0, 80, 576, 0), t: Tx(blade(i).key, lx, LABY[P.tex], 17, P.side === 'h' ? '#000' : '#353535', 1, 'transform:rotate(90deg);transform-origin:0 0') });
         if (tier === 1 && P.side !== 'h') out.bladeHits.push(Hit(P.x + 20, 0, P.side === 'l' ? 35 : 40, 576, function () { go(i); }, null, 'Open ' + blade(i).key));
       });
-      if (tier === 2) out.bladeHits.push(Hit(0, 0, 30, 576, function () { back(); }, null, 'Back to ' + blade(b).key));
+      if (tier === 2) out.bladeHits.push(Hit(18, 0, 60, 576, function () { back(); }, null, 'Back to ' + blade(b).key));
     }
     function title(k) { return k.charAt(0).toUpperCase() + k.slice(1); }
     function buttons(out, lx, end) {
@@ -286,7 +288,7 @@
         bladesOut(out, 1);
         homeContent(out, G.xh, G.end);
       } else {
-        frame(out, -40, W + 200, col, 2, W + 90);
+        frame(out, 18, W, col, 2);
         bladesOut(out, 2);
         var it = (bl.items || []).filter(function (x) { return x.id === st.item; })[0];
         out.texts.push(Tx(title(bl.key) + (it ? ' - ' + it.label : ''), 102, 38, 23, '#fff', 12, 'text-shadow:' + SH_BLACK));
@@ -349,8 +351,10 @@
       root.classList.toggle('mc-paged', hostOn);
       root.classList.toggle('calm', calm());
       if (hostOn) {
-        host.style.left = px(70 * s); host.style.top = px(oy + 70 * s);
-        host.style.width = px((W - 110) * s); host.style.height = px(435 * s);
+        // The page pane sits between the open blade's art (it reaches x + 74)
+        // and the right runner (from W - 52), so neither covers or cuts it.
+        host.style.left = px(98 * s); host.style.top = px(oy + 70 * s);
+        host.style.width = px((W - 158) * s); host.style.height = px(435 * s);
       }
       renderGuide();
       renderToast();
@@ -604,5 +608,6 @@
     };
   }
 
-  window.MC360 = { mount: mount, version: '1.0.0' };
+  // MC360.current: the running look (for checks from the page).
+  window.MC360 = { mount: function (o) { var m = mount(o); window.MC360.current = m; var d = m.destroy; m.destroy = function () { d(); if (window.MC360.current === m) window.MC360.current = null; }; return m; }, current: null, version: '1.0.1' };
 })();
