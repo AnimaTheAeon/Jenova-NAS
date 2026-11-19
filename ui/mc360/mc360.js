@@ -180,11 +180,19 @@
       }
       return res;
     }
+    // The skin is 576 tall: scale it to the window's height, but never so far
+    // that the narrowest layout (560 wide) runs off the side; any height left
+    // over is split above and below. Re-checked on every draw, so a window
+    // that was hidden or still sizing when the look started is put right.
+    var oy = 0, measured = '';
     function measure() {
       var h = window.innerHeight || 576, w = window.innerWidth || 1024;
-      s = Math.max(0.6, Math.min(3, h / 576));
+      if (h + 'x' + w === measured) return;
+      measured = h + 'x' + w;
+      s = Math.max(0.3, Math.min(3, h / 576, w / 560));
       W = Math.max(560, w / s);
-      [stage, front].forEach(function (x) { x.style.width = px(W); x.style.transform = 'scale(' + s + ')'; });
+      oy = Math.max(0, (h - 576 * s) / 2);
+      [stage, front].forEach(function (x) { x.style.width = px(W); x.style.top = px(oy); x.style.transform = 'scale(' + s + ')'; });
     }
 
     // ---------- layout ----------
@@ -291,6 +299,7 @@
     // ---------- render ----------
     function render() {
       if (destroyed) return;
+      measure();
       var out = layout();
       // main panel
       main.className = st.ghost ? 'mc-pan' : 'mc-pan trf';
@@ -340,7 +349,7 @@
       root.classList.toggle('mc-paged', hostOn);
       root.classList.toggle('calm', calm());
       if (hostOn) {
-        host.style.left = px(70 * s); host.style.top = px(70 * s);
+        host.style.left = px(70 * s); host.style.top = px(oy + 70 * s);
         host.style.width = px((W - 110) * s); host.style.height = px(435 * s);
       }
       renderGuide();
@@ -553,7 +562,7 @@
       if (st.guide) toggleGuide(); else if (st.tier === 2) back(); else if (st.b > 0) go(st.b - 1);
     }
     function onMouseDown(e) { if (e.button === 3) e.preventDefault(); firstGesture(); }
-    function onResize() { measure(); render(); }
+    function onResize() { render(); }
     window.addEventListener('keydown', onKey, true);
     window.addEventListener('mouseup', onMouseUp);
     window.addEventListener('mousedown', onMouseDown);

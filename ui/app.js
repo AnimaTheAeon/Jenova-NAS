@@ -407,7 +407,8 @@ async function mcOn() {
   });
   mc.host.classList.add("bbody");
   const blade = mcBladeOf(HIDDEN_PAGES[page] || page);
-  if (page === "watch") mc.home(blade); else mc.showPage(blade, (MC_BLADES[blade].items.find((it) => it.page === page) || {}).id);
+  // Start on the menu of the blade the current page belongs to; Enter opens the page.
+  mc.home(blade);
 }
 
 function mcOff() {

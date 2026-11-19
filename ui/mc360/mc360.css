@@ -19,7 +19,7 @@ body.mc360 { overflow: hidden; }
 .mc360-root .mc-still { display: none; }
 .mc360-root .mc-shine { position: absolute; pointer-events: none; z-index: 10; }
 .mc360-root .tr, .mc360-root .trf .ft { transition: left .7s cubic-bezier(.22,.9,.25,1), top .7s cubic-bezier(.22,.9,.25,1), width .7s cubic-bezier(.22,.9,.25,1), height .7s cubic-bezier(.22,.9,.25,1), opacity .5s ease; }
-.mc360-root .mc-host { position: absolute; z-index: 3; overflow: auto; display: flex; flex-direction: column; box-sizing: border-box; visibility: hidden; pointer-events: none; color: #000; font-family: "Segoe UI", Tahoma, sans-serif; user-select: text; -webkit-user-select: text; }
+.mc360-root .mc-host { position: absolute; z-index: 3; overflow: auto; display: flex; flex-direction: column; box-sizing: border-box; visibility: hidden; pointer-events: none; color: #fff; text-shadow: none; font-family: "Segoe UI", Tahoma, sans-serif; user-select: text; -webkit-user-select: text; }
 .mc360-root.mc-paged .mc-host { visibility: visible; pointer-events: auto; }
 .mc360-root .mc-scrim { position: absolute; left: 0; top: 0; width: 100%; height: 576px; background: rgba(0,0,0,.8); animation: mcFade .3s ease; }
 .mc360-root .mc-guide { position: absolute; left: 0; top: 0; width: 390px; height: 576px; animation: mcGuide .25s cubic-bezier(.22,.9,.25,1); }
