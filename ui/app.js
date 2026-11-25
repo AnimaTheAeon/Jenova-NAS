@@ -99,7 +99,10 @@ function buildMenu() {
       go(b.dataset.go);
     }
   });
-  go(location.hash.slice(1) || "watch");
+  // Always open on the main page; a page name left in the address (an old
+  // bookmark or a reload) is dropped rather than reopened.
+  if (location.hash) history.replaceState(null, "", location.pathname + location.search);
+  go("watch");
 }
 
 // ---------- Blades look ----------
@@ -579,7 +582,6 @@ function go(id) {
   glassPill();
   $$(".page").forEach((p) => p.classList.toggle("active", p.dataset.page === id));
   mcShow(id);
-  history.replaceState(null, "", "#" + id);
   const title = $("#g-title");
   if (title) title.textContent = (PAGES.find(([p]) => p === id) || [id, id === "log" ? "Log" : id])[1].toUpperCase();
   if ($("#g-tabs")) renderPageBar();
